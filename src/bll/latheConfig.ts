@@ -26,10 +26,10 @@ export default class LatheConfig {
 
     // Gear color configuration
     public gearColors = {
-        gearA: "#ffcccc", // Light red
-        gearB: "#ccffcc", // Light green
-        gearC: "#ccddff", // Light blue
-        gearD: "#ffe5cc"  // Light orange
+        gearA: "#aa3636", // Light red
+        gearB: "#349334", // Light green
+        gearC: "#365794", // Light blue
+        gearD: "#ab723d"  // Light orange
     };
 
     public get isMultiModule() {

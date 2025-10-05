@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GearOptimizer } from './gearOptimizer';
 import { PitchSetup } from './pitchSetup';
-import { Gear, GearModule } from './gear';
+import { Gear, Gears, GearModule } from './gear';
 import { Pitch, PitchType } from './pitch';
 import CombinationFinder from './combinationFinder';
 import LatheConfig from './latheConfig';
@@ -51,24 +51,24 @@ describe('GearOptimizer', () => {
             expect(result).toBe(accurate);
         });
 
-        it('should prefer 2-gear setup over 4-gear when accuracy is similar', () => {
-            const twoGear = new PitchSetup(
+        it('should prefer B=C setup over 4-gear when accuracy is similar', () => {
+            const bcSetup = new PitchSetup(
                 new Gear(module, 20),
-                undefined,
-                undefined,
+                new Gear(module, 45),
+                new Gear(module, 45),
                 new Gear(module, 80),
                 new Pitch(1.2500, PitchType.Metric)
             );
             const fourGear = new PitchSetup(
                 new Gear(module, 20),
-                new Gear(module, 45),
-                new Gear(module, 45),
+                new Gear(module, 40),
+                new Gear(module, 50),
                 new Gear(module, 80),
                 new Pitch(1.2500, PitchType.Metric)
             );
-            
-            const result = GearOptimizer.selectBest([fourGear, twoGear], 1.25, []);
-            expect(result).toBe(twoGear);
+
+            const result = GearOptimizer.selectBest([fourGear, bcSetup], 1.25, []);
+            expect(result).toBe(bcSetup);
         });
 
         it('should prefer gear reuse when accuracy is similar', () => {
@@ -305,6 +305,19 @@ describe('GearOptimizer', () => {
 
             console.log(`Generated ${combos.length} combinations`);
 
+            // Check overall 2-gear vs 4-gear distribution
+            const allTwoGear = combos.filter(c => c.gearB === undefined && c.gearC === undefined);
+            const allFourGear = combos.filter(c => c.gearB !== undefined || c.gearC !== undefined);
+            console.log(`Overall: ${allTwoGear.length} two-gear, ${allFourGear.length} four-gear`);
+
+            // Show some example 2-gear setups
+            if (allTwoGear.length > 0) {
+                console.log(`Example 2-gear setups:`);
+                allTwoGear.slice(0, 5).forEach(s => {
+                    console.log(`  ${s.gearA?.teeth}, -, -, ${s.gearD?.teeth} → ${s.pitch.convert().value.toFixed(3)} TPI`);
+                });
+            }
+
             // Find candidates for UNC #0 (80 TPI)
             const targetPitch = new Pitch(80, PitchType.Imperial);
             const targetMetric = targetPitch.convert();
@@ -316,6 +329,16 @@ describe('GearOptimizer', () => {
             );
 
             console.log(`Found ${candidates.length} candidates for UNC #0 (80 TPI)`);
+
+            // Check how many are 2-gear vs 4-gear
+            const twoGearCandidates = candidates.filter(c => c.gearB === undefined && c.gearC === undefined);
+            const fourGearCandidates = candidates.filter(c => c.gearB !== undefined || c.gearC !== undefined);
+            console.log(`  - 2-gear setups: ${twoGearCandidates.length}`);
+            console.log(`  - 4-gear setups: ${fourGearCandidates.length}`);
+
+            if (twoGearCandidates.length > 0) {
+                console.log(`  - Best 2-gear: ${twoGearCandidates[0].gearA?.teeth}, -, -, ${twoGearCandidates[0].gearD?.teeth} → ${twoGearCandidates[0].pitch.convert().value.toFixed(3)} TPI`);
+            }
 
             // Find the best one
             const best = GearOptimizer.selectBest(candidates, targetMetric.value, []);
@@ -384,6 +407,66 @@ describe('GearOptimizer', () => {
                 console.log(`${name} error: ${error.toFixed(3)} TPI`);
                 expect(error).toBeLessThan(0.1);
             });
+        });
+
+        it('should find simplified 2-gear setups from CSV', () => {
+            // Test some of the "ANY" setups from the CSV
+            const config = new LatheConfig();
+            config.leadscrew = new Pitch(16, PitchType.Imperial);
+
+            const finder = new CombinationFinder(undefined, true);
+            const combos = finder.findAllCombinations(config);
+
+            // Check for simplified 2-gear setups (B = C)
+            const simplified2Gear = combos.filter(c =>
+                c.gearB && c.gearC && Gears.equal(c.gearB, c.gearC)
+            );
+
+            console.log(`\nSimplified 2-gear setups (B=C): ${simplified2Gear.length}`);
+
+            // Show some examples
+            if (simplified2Gear.length > 0) {
+                console.log(`Examples:`);
+                simplified2Gear.slice(0, 10).forEach(s => {
+                    console.log(`  ${s.gearA?.teeth}, ${s.gearB?.teeth}, ${s.gearC?.teeth}, ${s.gearD?.teeth} → ${s.pitch.convert().value.toFixed(3)} TPI`);
+                });
+            }
+
+            // Check specific CSV examples
+            // "8 TPI" should be: 40, ANY, -, 20
+            // This means A=40, D=20, with B as spacer (B=C)
+            const eightTPI = combos.filter(c => {
+                const tpi = c.pitch.convert().value;
+                return Math.abs(tpi - 8) < 0.01 &&
+                       c.gearA?.teeth === 40 &&
+                       c.gearD?.teeth === 20 &&
+                       c.gearB && c.gearC && Gears.equal(c.gearB, c.gearC);
+            });
+
+            console.log(`\n8 TPI candidates (40, B=C, 20): ${eightTPI.length}`);
+            if (eightTPI.length > 0) {
+                eightTPI.forEach(s => {
+                    console.log(`  40, ${s.gearB?.teeth}, ${s.gearC?.teeth}, 20 → ${s.pitch.convert().value.toFixed(3)} TPI`);
+                });
+            }
+
+            // "64 TPI" should be: 20, ANY, -, 80
+            const sixtyFourTPI = combos.filter(c => {
+                const tpi = c.pitch.convert().value;
+                return Math.abs(tpi - 64) < 0.01 &&
+                       c.gearA?.teeth === 20 &&
+                       c.gearD?.teeth === 80 &&
+                       c.gearB && c.gearC && Gears.equal(c.gearB, c.gearC);
+            });
+
+            console.log(`\n64 TPI candidates (20, B=C, 80): ${sixtyFourTPI.length}`);
+            if (sixtyFourTPI.length > 0) {
+                sixtyFourTPI.forEach(s => {
+                    console.log(`  20, ${s.gearB?.teeth}, ${s.gearC?.teeth}, 80 → ${s.pitch.convert().value.toFixed(3)} TPI`);
+                });
+            }
+
+            expect(simplified2Gear.length).toBeGreaterThan(0);
         });
     });
 });

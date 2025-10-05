@@ -44,10 +44,16 @@ export default class CombinationFinder {
                 if (b == a)
                     continue;
                 for (let c = 0; c < gears.length; c++) {
-                    if (c == a || c == b)
+                    // Allow B = C (represents 2-gear setup with B as spacer)
+                    if (c == a)
                         continue;
                     for (let d = 0; d < gears.length; d++) {
-                        if (d == a || d == b || d == c)
+                        // When B = C (simplified 2-gear), C is not in the gear train
+                        // So D can equal C, but not A or B
+                        const isSimplifed2Gear = (b == c);
+                        if (d == a || d == b)
+                            continue;
+                        if (!isSimplifed2Gear && d == c)
                             continue;
                         const ga = gears[a];
                         const gb = gears[b];

@@ -167,6 +167,7 @@ export default {
             // Collect all auto-favorite candidates for batch optimization
             const autoFavoriteCandidates: Array<{
                 pitch: Pitch,
+                originalPitchType: PitchType,
                 name: string,
                 candidates: PitchSetup[]
             }> = [];
@@ -174,6 +175,7 @@ export default {
             // Calculate best setup for a thread
             function f(p: Pitch, name: string){
                 let type = p.type;
+                const originalPitchType = p.type; // Store original type before conversion
                 p = p.type == PitchType.Metric ? p : p.convert();
                 let n  = t.combos.filter(s => s.pitch.value > p.value / thr && s.pitch.value < p.value * thr);
 
@@ -181,6 +183,7 @@ export default {
                 if(name && autoFavoriteThreads.includes(name)) {
                     autoFavoriteCandidates.push({
                         pitch: p,
+                        originalPitchType: originalPitchType, // Store original type
                         name: name,
                         candidates: n
                     });
@@ -305,9 +308,25 @@ export default {
                     }))
                 );
 
-                // Add optimized favorites with names
+                // Add optimized favorites with names, preserving original pitch type
                 optimizedFavorites.forEach(({setup, name}) => {
-                    const namedSetup = NamedPitchSetup.fromSetup(setup).withName(name);
+                    // Find the original pitch type for this thread
+                    const originalCandidate = autoFavoriteCandidates.find(c => c.name === name);
+                    const originalPitchType = originalCandidate?.originalPitchType;
+
+                    // Convert pitch to original type if needed
+                    let finalSetup = setup;
+                    if (originalPitchType !== undefined && setup.pitch.type !== originalPitchType) {
+                        finalSetup = new PitchSetup(
+                            setup.gearA,
+                            setup.gearB,
+                            setup.gearC,
+                            setup.gearD,
+                            setup.pitch.convert()
+                        );
+                    }
+
+                    const namedSetup = NamedPitchSetup.fromSetup(finalSetup).withName(name);
                     GlobalConfig.addFavorite(namedSetup);
                 });
             }

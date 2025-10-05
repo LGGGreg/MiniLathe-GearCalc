@@ -48,6 +48,11 @@ export class PitchSetup {
     }
 
     public areGearsClearingAxles(minTeeth: number){
+        // True 2-gear setups (B and C undefined) don't need clearance checks
+        if (this.gearB == undefined && this.gearC == undefined) {
+            return true;
+        }
+
         const pcA = Gears.pitchRadius(this.gearA)!;
         const pcB = Gears.pitchRadius(this.gearB)!;
         const pcC = Gears.pitchRadius(this.gearC)!;
@@ -61,26 +66,28 @@ export class PitchSetup {
         // gear B interferes with the leadscrew axle
         if (pcB > pcC + pcD - axleRadius)
             return false;
-        
+
         // gear C interferes with the driving axle
         if (pcC > pcA + pcB - axleRadius)
             return false;
-            
+
         return true;
     }
 
     public areGearsProvided() : boolean {
-        return (this.gearA != undefined && this.gearD != undefined) &&
-            ((this.gearB == undefined && this.gearC == undefined) || (this.gearB != undefined && this.gearC != undefined));
+        // All 4 gears must be provided (true 2-gear not physically possible)
+        return this.gearA != undefined && this.gearB != undefined &&
+               this.gearC != undefined && this.gearD != undefined;
     }
 
     public areModulesMatching(): boolean {
-        if (this.gearB == undefined && this.gearC == undefined){
-            return this.gearA!.module.equals(this.gearD!.module);
-        } else if (this.gearB != undefined && this.gearC != undefined) {
-            return this.gearA!.module.equals(this.gearB.module) &&
-                this.gearC.module.equals(this.gearD!.module);
-        } else return false;
+        // All 4 gears must be provided and modules must match
+        if (this.gearA == undefined || this.gearB == undefined ||
+            this.gearC == undefined || this.gearD == undefined) {
+            return false;
+        }
+        return this.gearA.module.equals(this.gearB.module) &&
+               this.gearC.module.equals(this.gearD.module);
     }
 
     public toString() : string{
@@ -131,14 +138,11 @@ export class PitchSetup {
     }
 
     public static fromGearsAndLeadscrew(gearA: Gear | undefined, gearB: Gear | undefined, gearC: Gear | undefined, gearD: Gear | undefined, leadscrew: Pitch): PitchSetup {
-        if (gearA == undefined || gearD == undefined){
+        if (gearA == undefined || gearD == undefined || gearB == undefined || gearC == undefined){
             return new PitchSetup(gearA,gearB,gearC,gearD, new Pitch(0, leadscrew.type));
         }
-        const ratio = gearB == undefined && gearC == undefined
-            ? gearD.teeth / gearA.teeth 
-            : gearB != undefined && gearC != undefined
-                ? (gearB.teeth * gearD.teeth) / (gearA.teeth * gearC.teeth)
-                : 0;
-        return new PitchSetup(gearA, gearB ?? undefined, gearC ?? undefined, gearD, leadscrew.withRatio(ratio));
+        // All 4 gears must be provided (true 2-gear not physically possible)
+        const ratio = (gearB.teeth * gearD.teeth) / (gearA.teeth * gearC.teeth);
+        return new PitchSetup(gearA, gearB, gearC, gearD, leadscrew.withRatio(ratio));
     }
 }

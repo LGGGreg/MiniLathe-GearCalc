@@ -210,6 +210,6 @@ svg .headstock {
     fill: #CCC;
 }
 svg .body {
-    fill: #2d4ea8;
+    fill: #946d6d;
 }
 </style>

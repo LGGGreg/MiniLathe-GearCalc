@@ -76,12 +76,14 @@ export default {
         // Add pitch columns (Pi and Pm) with conditional greying
         columns.push(
             new GridColumnDefinition("pi", "Pi", i => i.pitch, i18n.genericPitch+' ('+i18n.genericImperial+')')
-                .withHtml(PitchHelper.formatFnShowImperialGreyed)
+                .withFormat(PitchHelper.formatFnShowImperialGreyed)
+                .withHtml()
                 .withSortForValues(PitchHelper.sortFnPreferImperial)
                 .withStyle("width: 20%")
                 .withAlignRight().withHeaderAlignRight(),
             new GridColumnDefinition("pm", "Pm", i => i.pitch, i18n.genericPitch+' ('+i18n.genericMetric+')')
-                .withHtml(PitchHelper.formatFnShowMetricGreyed)
+                .withFormat(PitchHelper.formatFnShowMetricGreyed)
+                .withHtml()
                 .withSortForValues(PitchHelper.sortFnPreferMetric)
                 .withStyle("width: 20%")
                 .withAlignRight().withHeaderAlignRight()

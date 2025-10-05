@@ -146,13 +146,21 @@ export default class GlobalConfig {
         const leadscrew = this._config.leadscrew;
         this._favorites = this._favorites.map(fav => {
             // Recalculate pitch from gears and current leadscrew
-            return PitchSetup.fromGearsAndLeadscrew(
+            const recalculated = PitchSetup.fromGearsAndLeadscrew(
                 fav.gearA,
                 fav.gearB,
                 fav.gearC,
                 fav.gearD,
                 leadscrew
             ).withName(fav.name);
+
+            // Preserve the original pitch type (metric vs imperial)
+            // If the original was metric, convert the recalculated pitch to metric
+            if (fav.pitch.type != recalculated.pitch.type) {
+                recalculated.pitch = recalculated.pitch.convert();
+            }
+
+            return recalculated;
         });
         this.saveFavorites();
     }

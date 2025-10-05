@@ -99,20 +99,22 @@ export class GearOptimizer {
         // Closer to target = higher score
         const pitchError = Math.abs(setup.pitch.value - targetPitch);
         const pitchAccuracyScore = 10000 / (1 + pitchError * 1000);
-        score += pitchAccuracyScore;
+        score += (pitchAccuracyScore * 1000);
         
-        // 2. Simplicity bonus - weight: 100
-        // Prefer 2-gear setups (A-D only) over 4-gear setups (A-B-C-D)
-        const is2GearSetup = setup.gearB === undefined && setup.gearC === undefined;
-        if (is2GearSetup) {
-            score += 100;
+        // 2. Simplicity bonus
+        // Prefer simplified 2-gear setups (B = C) over complex 4-gear setups
+        // When B = C, B acts as spacer and C is not connected (D contacts B directly)
+        // Note: True 2-gear (B and C undefined) is not physically possible on this lathe
+        const isSimplified2Gear = setup.gearB && setup.gearC && Gears.equal(setup.gearB, setup.gearC);
+        if (isSimplified2Gear) {
+            score += 120000;  // B=C gets strong bonus (much simpler than 4 different gears)
         }
         
         // 3. Gear reuse score - weight: 50 per matching gear
         // Prefer setups that use gears already in favorites
         if (favorites.length > 0) {
             const reuseScore = this.calculateGearReuseScore(setup, favorites);
-            score += reuseScore * 50;
+            score += reuseScore * 5;
         }
         
         // 4. Common gear position bonus - weight: 20 per position
