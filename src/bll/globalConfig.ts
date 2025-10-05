@@ -79,8 +79,18 @@ export default class GlobalConfig {
     }
 
     public static addFavorite(s: PitchSetup) {
-        if(this.indexOfFavorite(s) == -1){
+        // For named favorites (auto-favorites), check by name
+        // For manual favorites, check by gear combination
+        const existingIndex = s.name
+            ? this.indexOfFavoriteByName(s.name)
+            : this.indexOfFavorite(s);
+
+        if(existingIndex == -1){
             this._favorites.push(s);
+            this.saveFavorites();
+        } else if (s.name) {
+            // Update existing auto-favorite with better gear combination
+            this._favorites[existingIndex] = s;
             this.saveFavorites();
         }
     }
@@ -117,6 +127,53 @@ export default class GlobalConfig {
                 return Number(i);
         }
         return -1;
+    }
+
+    private static indexOfFavoriteByName(name: string): number{
+        for (const i in this._favorites) {
+            const f = this._favorites[i];
+            if(f.name === name)
+                return Number(i);
+        }
+        return -1;
+    }
+
+    /**
+     * Recalculate all favorites with the current leadscrew pitch
+     * This should be called when the leadscrew configuration changes
+     */
+    public static recalculateFavorites() {
+        const leadscrew = this._config.leadscrew;
+        this._favorites = this._favorites.map(fav => {
+            // Recalculate pitch from gears and current leadscrew
+            return PitchSetup.fromGearsAndLeadscrew(
+                fav.gearA,
+                fav.gearB,
+                fav.gearC,
+                fav.gearD,
+                leadscrew
+            ).withName(fav.name);
+        });
+        this.saveFavorites();
+    }
+
+    /**
+     * Clear all auto-favorites (favorites with names)
+     * This allows them to be recalculated with the new optimizer
+     */
+    public static clearAutoFavorites() {
+        // Remove favorites that have names (auto-favorites)
+        this._favorites = this._favorites.filter(fav => !fav.name);
+        this.saveFavorites();
+    }
+
+    /**
+     * Clear ALL favorites (both auto and manual)
+     * Used when recalculating everything from scratch
+     */
+    public static clearAllFavorites() {
+        this._favorites = [];
+        this.saveFavorites();
     }
 
 

@@ -1,10 +1,22 @@
 <template>
-    <g :transform="'translate('+cx+' '+cy+')'">
+    <g :transform="'translate('+cx+' '+cy+')'" :style="{'fill': gearColor}">
         <path :d="path" />
-        
+
         <g v-if="sizeText && gearVal.teeth >= 30" :transform="'rotate(' + textRotation + ')'" >
+        <defs>
+            <filter :id="'textGlow'+id" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur"/>
+                <feFlood :flood-color="textColor" flood-opacity="0.8" result="color"/>
+                <feComposite in="color" in2="blur" operator="in" result="glow"/>
+                <feMerge>
+                    <feMergeNode in="glow"/>
+                    <feMergeNode in="glow"/>
+                    <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+            </filter>
+        </defs>
         <path :id="'curve'+id" stroke="none" fill="none" :d="'M '+(-(pitchR - 3))+' 0 A '+(pitchR - 3)+' '+(pitchR - 3)+' 0 0 0 '+(pitchR - 3)+' 0'" />
-        <text width="100" alignment-baseline="baseline" :style="{'font-size':  (gearVal.module.toMetric().number * 8)+'px' }" style="letter-spacing: 2px;" stroke="none" fill="#888">
+        <text width="100" alignment-baseline="baseline" :style="{'font-size':  (gearVal.module.toMetric().number * 8)+'px', 'filter': 'url(#textGlow'+id+')', 'fill': textColor }" style="letter-spacing: 2px; font-weight: bold;" stroke="none">
             <textPath :xlink:href="'#curve'+id">
             {{ gear.toString() }}
             </textPath>
@@ -26,7 +38,9 @@ export default {
         gear: {type: [Gear, String], required: true},
         module: {type: Number, default: 1},
         sizeText: {type: Boolean, default: false},
-        textRotation: {type: Number, default: 0}
+        textRotation: {type: Number, default: 0},
+        gearColor: {type: String, default: "#DDD"},
+        gearId: {type: String, default: ""}
     },
     methods: {
         getPoint(tooth: number, point: number, angleStep: number){
@@ -51,6 +65,20 @@ export default {
     computed: {
         gearVal() { return typeof(this.gear) == "string" ? Gear.fromString(this.gear)! : this.gear; },
         pitchR() { return Gears.pitchRadius(this.gearVal)!; },
+        textColor() {
+            // Calculate text color based on gear color for better contrast
+            const color = this.gearColor;
+            // Simple approach: use darker version of the gear color
+            const hex = color.replace('#', '');
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            // Darken by 40%
+            const darkR = Math.floor(r * 0.6);
+            const darkG = Math.floor(g * 0.6);
+            const darkB = Math.floor(b * 0.6);
+            return `rgb(${darkR}, ${darkG}, ${darkB})`;
+        },
         path(){
             const angleStep = Math.PI * 2 / this.gearVal.teeth;
 

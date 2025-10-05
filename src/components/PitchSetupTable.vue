@@ -1,12 +1,18 @@
 <template>
-    <div>
-      <DataGrid 
-        v-model="filteredModel" 
-        v-model:columns="cols" 
-        v-model:sortByColumn="order" 
+    <div class="pitch-setup-table"
+         :style="{
+           '--gear-a-color': config.gearColors.gearA,
+           '--gear-b-color': config.gearColors.gearB,
+           '--gear-c-color': config.gearColors.gearC,
+           '--gear-d-color': config.gearColors.gearD
+         }">
+      <DataGrid
+        v-model="filteredModel"
+        v-model:columns="cols"
+        v-model:sortByColumn="order"
         v-model:sortAscending="ascending"
-        v-model:selectedItems="selectedItems" 
-        :isSortable="isSortable" 
+        v-model:selectedItems="selectedItems"
+        :isSortable="isSortable"
         :selectionMode="GridSelectionMode.One"
         :isExportEnabled="isExportEnabled"
         :isPrintEnabled="isPrintEnabled && !isNativeApp"
@@ -55,37 +61,66 @@ export default {
     data() {
         const i18n = GlobalConfig.i18n;
         const downloader = new GCDownloader();
+
+        // Build columns array - conditionally include name column
+        const columns = [];
+
+        // Add name column if items have a name property
+        if (this.showNameColumn) {
+            columns.push(
+                new GridColumnDefinition("name", i18n.ptName, i => i.name)
+                    .withStyle("width: 15%")
+            );
+        }
+
+        // Add pitch columns (Pi and Pm) with conditional greying
+        columns.push(
+            new GridColumnDefinition("pi", "Pi", i => i.pitch, i18n.genericPitch+' ('+i18n.genericImperial+')')
+                .withHtml(PitchHelper.formatFnShowImperialGreyed)
+                .withSortForValues(PitchHelper.sortFnPreferImperial)
+                .withStyle("width: 20%")
+                .withAlignRight().withHeaderAlignRight(),
+            new GridColumnDefinition("pm", "Pm", i => i.pitch, i18n.genericPitch+' ('+i18n.genericMetric+')')
+                .withHtml(PitchHelper.formatFnShowMetricGreyed)
+                .withSortForValues(PitchHelper.sortFnPreferMetric)
+                .withStyle("width: 20%")
+                .withAlignRight().withHeaderAlignRight()
+        );
+
+        // Add gear columns (A, B, C, D) with colored text using CSS classes
+        columns.push(
+            new GridColumnDefinition("a", "A", i => i.gearA)
+                .withFormat(g => GearHelper.formatFn(g, () => this.hideModules))
+                .withExportFn(g => g.toString())
+                .withSortForValues(GearHelper.sortFn)
+                .withStyle("width: 10%")
+                .withCssClasses(['gear-a-color'])
+                .withAlignRight().withHeaderAlignRight(),
+            new GridColumnDefinition("b", "B", i => i.gearB)
+                .withFormat(g => GearHelper.formatFn(g, () => this.hideModules))
+                .withExportFn(g => g.toString())
+                .withSortForValues(GearHelper.sortFn)
+                .withStyle("width: 10%")
+                .withCssClasses(['gear-b-color'])
+                .withAlignRight().withHeaderAlignRight(),
+            new GridColumnDefinition("c", "C", i => i.gearC)
+                .withFormat(g => GearHelper.formatFn(g, () => this.hideModules))
+                .withExportFn(g => g.toString())
+                .withSortForValues(GearHelper.sortFn)
+                .withStyle("width: 10%")
+                .withCssClasses(['gear-c-color'])
+                .withAlignRight().withHeaderAlignRight(),
+            new GridColumnDefinition("d", "D", i => i.gearD)
+                .withFormat(g => GearHelper.formatFn(g, () => this.hideModules))
+                .withExportFn(g => g.toString())
+                .withSortForValues(GearHelper.sortFn)
+                .withStyle("width: 10%")
+                .withCssClasses(['gear-d-color'])
+                .withAlignRight().withHeaderAlignRight()
+        );
+
         return {
-            cols: [
-                new GridColumnDefinition("a", "A", i => i.gearA)
-                    .withFormat(g => GearHelper.formatFn(g, () => this.hideModules))
-                    .withExportFn(g => g.toString())
-                    .withSortForValues(GearHelper.sortFn)
-                    .withStyle("width: 10%").withAlignRight().withHeaderAlignRight(),
-                new GridColumnDefinition("b", "B", i => i.gearB)
-                    .withFormat(g => GearHelper.formatFn(g, () => this.hideModules))
-                    .withExportFn(g => g.toString())
-                    .withSortForValues(GearHelper.sortFn)
-                    .withStyle("width: 10%").withAlignRight().withHeaderAlignRight(),
-                new GridColumnDefinition("c", "C", i => i.gearC)
-                    .withFormat(g => GearHelper.formatFn(g, () => this.hideModules))
-                    .withExportFn(g => g.toString())
-                    .withSortForValues(GearHelper.sortFn)
-                    .withStyle("width: 10%").withAlignRight().withHeaderAlignRight(),
-                new GridColumnDefinition("d", "D", i => i.gearD)
-                    .withFormat(g => GearHelper.formatFn(g, () => this.hideModules))
-                    .withExportFn(g => g.toString())
-                    .withSortForValues(GearHelper.sortFn)
-                    .withStyle("width: 10%").withAlignRight().withHeaderAlignRight(),
-                new GridColumnDefinition("pm", "Pm", i => i.pitch, i18n.genericPitch+' ('+i18n.genericMetric+')')
-                    .withFormat(PitchHelper.formatFnShowMetric)
-                    .withSortForValues(PitchHelper.sortFnPreferMetric)
-                    .withStyle("width: 30%").withAlignRight().withHeaderAlignRight(),
-                new GridColumnDefinition("pi", "Pi", i => i.pitch, i18n.genericPitch+' ('+i18n.genericImperial+')')
-                    .withFormat(PitchHelper.formatFnShowImperial)
-                    .withSortForValues(PitchHelper.sortFnPreferImperial)
-                    .withStyle("width: 30%").withAlignRight().withHeaderAlignRight(),
-            ],
+            cols: columns,
             isNativeApp: true,
             config: GlobalConfig.config,
             favorites: GlobalConfig.favorites,
@@ -96,7 +131,7 @@ export default {
         };
     },
     props: {
-        modelValue: { type: Array<PitchSetup>, required: true }, 
+        modelValue: { type: Array<PitchSetup>, required: true },
         orderBy: { type: String, default: undefined },
         orderAscending: { type: Boolean, default: true },
         filter: { type: Object, default: null },
@@ -108,6 +143,7 @@ export default {
         itemsPerPage: {type: Number, default: Number.POSITIVE_INFINITY},
         rowCommands: {type: Array<IGridRowCommandDefinition>, default: [] as IGridRowCommandDefinition[] },
         hideModules: {type: Boolean, default: false},
+        showNameColumn: {type: Boolean, default: false},
     },
     computed: {
         filteredModel() {
@@ -140,3 +176,25 @@ export default {
     components: { DataGrid }
 }
 </script>
+<style>
+/* Gear color classes - use CSS variables from parent */
+.pitch-setup-table .gear-a-color {
+    color: var(--gear-a-color) !important;
+    font-weight: 600 !important;
+}
+
+.pitch-setup-table .gear-b-color {
+    color: var(--gear-b-color) !important;
+    font-weight: 600 !important;
+}
+
+.pitch-setup-table .gear-c-color {
+    color: var(--gear-c-color) !important;
+    font-weight: 600 !important;
+}
+
+.pitch-setup-table .gear-d-color {
+    color: var(--gear-d-color) !important;
+    font-weight: 600 !important;
+}
+</style>

@@ -8,8 +8,8 @@ export class GearHelper {
     private static get config() {return GlobalConfig.config; }
 
     public static sortFn = function(a: Gear, b: Gear) { return Gears.compare(a,b); };
-    public static formatFn = function(g: Gear, hideModuleFn: () => boolean = () => false) { 
-        return g == undefined || g == null ? "" : GearHelper.config.isMultiModule && !hideModuleFn() ? g.toString() : g.teeth.toFixed(0); 
+    public static formatFn = function(g: Gear, hideModuleFn: () => boolean = () => false) {
+        return g == undefined || g == null ? "" : GearHelper.config.isMultiModule && !hideModuleFn() ? g.toString() : g.teeth.toFixed(0);
     }
 }
 
@@ -41,6 +41,24 @@ export class PitchHelper {
     }
     public static formatFnShowImperial = function(p: Pitch) {
         return p == null || p == undefined ? "" : PitchHelper.formatFn(p.type == PitchType.Metric ? p.convert() : p);
+    }
+
+    // Format functions that grey out non-native pitch types
+    public static formatFnShowMetricGreyed = function(p: Pitch) {
+        if (p == null || p == undefined) return "";
+        const text = PitchHelper.formatFn(p.type == PitchType.Metric ? p : p.convert());
+        // Grey out if original pitch was imperial
+        return p.type == PitchType.Imperial
+            ? `<span style="color: #999; opacity: 0.5;">${text}</span>`
+            : text;
+    }
+    public static formatFnShowImperialGreyed = function(p: Pitch) {
+        if (p == null || p == undefined) return "";
+        const text = PitchHelper.formatFn(p.type == PitchType.Metric ? p.convert() : p);
+        // Grey out if original pitch was metric
+        return p.type == PitchType.Metric
+            ? `<span style="color: #999; opacity: 0.5;">${text}</span>`
+            : text;
     }
 }
 

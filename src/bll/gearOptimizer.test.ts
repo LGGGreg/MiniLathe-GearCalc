@@ -1,0 +1,390 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { GearOptimizer } from './gearOptimizer';
+import { PitchSetup } from './pitchSetup';
+import { Gear, GearModule } from './gear';
+import { Pitch, PitchType } from './pitch';
+import CombinationFinder from './combinationFinder';
+import LatheConfig from './latheConfig';
+
+describe('GearOptimizer', () => {
+    let module: GearModule;
+    
+    beforeEach(() => {
+        module = GearModule.fromString("M1")!;
+    });
+
+    describe('selectBest', () => {
+        it('should return null for empty candidates', () => {
+            const result = GearOptimizer.selectBest([], 1.25, []);
+            expect(result).toBeNull();
+        });
+
+        it('should return the only candidate when there is one', () => {
+            const setup = new PitchSetup(
+                new Gear(module, 20),
+                undefined,
+                undefined,
+                new Gear(module, 80),
+                new Pitch(1.25, PitchType.Metric)
+            );
+            const result = GearOptimizer.selectBest([setup], 1.25, []);
+            expect(result).toBe(setup);
+        });
+
+        it('should prefer more accurate pitch when accuracy differs significantly', () => {
+            const accurate = new PitchSetup(
+                new Gear(module, 20),
+                undefined,
+                undefined,
+                new Gear(module, 80),
+                new Pitch(1.2500, PitchType.Metric)
+            );
+            const lessAccurate = new PitchSetup(
+                new Gear(module, 21),
+                undefined,
+                undefined,
+                new Gear(module, 65),
+                new Pitch(1.2476, PitchType.Metric)
+            );
+            
+            const result = GearOptimizer.selectBest([accurate, lessAccurate], 1.25, []);
+            expect(result).toBe(accurate);
+        });
+
+        it('should prefer 2-gear setup over 4-gear when accuracy is similar', () => {
+            const twoGear = new PitchSetup(
+                new Gear(module, 20),
+                undefined,
+                undefined,
+                new Gear(module, 80),
+                new Pitch(1.2500, PitchType.Metric)
+            );
+            const fourGear = new PitchSetup(
+                new Gear(module, 20),
+                new Gear(module, 45),
+                new Gear(module, 45),
+                new Gear(module, 80),
+                new Pitch(1.2500, PitchType.Metric)
+            );
+            
+            const result = GearOptimizer.selectBest([fourGear, twoGear], 1.25, []);
+            expect(result).toBe(twoGear);
+        });
+
+        it('should prefer gear reuse when accuracy is similar', () => {
+            const favorites = [
+                new PitchSetup(
+                    new Gear(module, 20),
+                    new Gear(module, 40),
+                    new Gear(module, 40),
+                    new Gear(module, 80),
+                    new Pitch(1.0, PitchType.Metric)
+                )
+            ];
+
+            const reuseGears = new PitchSetup(
+                new Gear(module, 20),
+                new Gear(module, 40),
+                new Gear(module, 40),
+                new Gear(module, 80),
+                new Pitch(1.2500, PitchType.Metric)
+            );
+            const newGears = new PitchSetup(
+                new Gear(module, 21),
+                new Gear(module, 45),
+                new Gear(module, 45),
+                new Gear(module, 65),
+                new Pitch(1.2500, PitchType.Metric)
+            );
+            
+            const result = GearOptimizer.selectBest([newGears, reuseGears], 1.25, favorites);
+            expect(result).toBe(reuseGears);
+        });
+
+        it('should prefer position consistency when other factors are equal', () => {
+            const favorites = [
+                new PitchSetup(
+                    new Gear(module, 20),
+                    new Gear(module, 40),
+                    new Gear(module, 40),
+                    new Gear(module, 80),
+                    new Pitch(1.0, PitchType.Metric)
+                ),
+                new PitchSetup(
+                    new Gear(module, 20),
+                    new Gear(module, 40),
+                    new Gear(module, 40),
+                    new Gear(module, 80),
+                    new Pitch(1.25, PitchType.Metric)
+                )
+            ];
+
+            // Setup with 4 matching positions (A, B, C, D) - all gears in same positions
+            const moreConsistent = new PitchSetup(
+                new Gear(module, 20), // Same as favorite position A ✓
+                new Gear(module, 40), // Same as favorite position B ✓
+                new Gear(module, 40), // Same as favorite position C ✓
+                new Gear(module, 80), // Same as favorite position D ✓
+                new Pitch(1.5000, PitchType.Metric)
+            );
+            // Setup with 3 matching gears but different positions
+            const lessConsistent = new PitchSetup(
+                new Gear(module, 21), // Different gear
+                new Gear(module, 40), // Same as favorite position B ✓
+                new Gear(module, 40), // Same as favorite position C ✓
+                new Gear(module, 80), // Same as favorite position D ✓
+                new Pitch(1.5000, PitchType.Metric)
+            );
+
+            // moreConsistent has 4 gears matching positions vs 3, and 4 gears reused vs 3
+            const result = GearOptimizer.selectBest([lessConsistent, moreConsistent], 1.5, favorites);
+            expect(result).toBe(moreConsistent);
+        });
+    });
+
+    describe('analyzeGearUsage', () => {
+        it('should return empty map for no favorites', () => {
+            const usage = GearOptimizer.analyzeGearUsage([]);
+            expect(usage.size).toBe(0);
+        });
+
+        it('should count gear usage correctly', () => {
+            const favorites = [
+                new PitchSetup(
+                    new Gear(module, 20),
+                    new Gear(module, 40),
+                    new Gear(module, 40),
+                    new Gear(module, 80),
+                    new Pitch(1.0, PitchType.Metric)
+                ),
+                new PitchSetup(
+                    new Gear(module, 20),
+                    new Gear(module, 45),
+                    new Gear(module, 45),
+                    new Gear(module, 80),
+                    new Pitch(1.25, PitchType.Metric)
+                ),
+                new PitchSetup(
+                    new Gear(module, 20),
+                    undefined,
+                    undefined,
+                    new Gear(module, 80),
+                    new Pitch(1.6, PitchType.Metric)
+                )
+            ];
+
+            const usage = GearOptimizer.analyzeGearUsage(favorites);
+
+            expect(usage.get("M1 Z20")).toBe(3); // Used in all 3
+            expect(usage.get("M1 Z80")).toBe(3); // Used in all 3
+            expect(usage.get("M1 Z40")).toBe(2); // Used in first setup (B and C)
+            expect(usage.get("M1 Z45")).toBe(2); // Used in second setup (B and C)
+        });
+    });
+
+    describe('getGearStatistics', () => {
+        it('should return correct statistics', () => {
+            const favorites = [
+                new PitchSetup(
+                    new Gear(module, 20),
+                    new Gear(module, 40),
+                    new Gear(module, 40),
+                    new Gear(module, 80),
+                    new Pitch(1.0, PitchType.Metric)
+                ),
+                new PitchSetup(
+                    new Gear(module, 20),
+                    new Gear(module, 45),
+                    new Gear(module, 45),
+                    new Gear(module, 80),
+                    new Pitch(1.25, PitchType.Metric)
+                ),
+                new PitchSetup(
+                    new Gear(module, 20),
+                    undefined,
+                    undefined,
+                    new Gear(module, 80),
+                    new Pitch(1.6, PitchType.Metric)
+                )
+            ];
+
+            const stats = GearOptimizer.getGearStatistics(favorites);
+            
+            expect(stats.totalSetups).toBe(3);
+            expect(stats.twoGearSetups).toBe(1);
+            expect(stats.fourGearSetups).toBe(2);
+            expect(stats.mostUsedGears.length).toBeGreaterThan(0);
+            expect(stats.mostUsedGears[0].gear).toBe("M1 Z20"); // Most used
+            expect(stats.mostUsedGears[0].count).toBe(3);
+        });
+
+        it('should track gears by position correctly', () => {
+            const favorites = [
+                new PitchSetup(
+                    new Gear(module, 20),
+                    new Gear(module, 40),
+                    new Gear(module, 40),
+                    new Gear(module, 80),
+                    new Pitch(1.0, PitchType.Metric)
+                ),
+                new PitchSetup(
+                    new Gear(module, 20),
+                    new Gear(module, 45),
+                    new Gear(module, 45),
+                    new Gear(module, 80),
+                    new Pitch(1.25, PitchType.Metric)
+                )
+            ];
+
+            const stats = GearOptimizer.getGearStatistics(favorites);
+
+            expect(stats.gearsByPosition.A.get("M1 Z20")).toBe(2);
+            expect(stats.gearsByPosition.B.get("M1 Z40")).toBe(1);
+            expect(stats.gearsByPosition.B.get("M1 Z45")).toBe(1);
+            expect(stats.gearsByPosition.C.get("M1 Z40")).toBe(1);
+            expect(stats.gearsByPosition.C.get("M1 Z45")).toBe(1);
+            expect(stats.gearsByPosition.D.get("M1 Z80")).toBe(2);
+        });
+    });
+
+    describe('Real-world scenarios', () => {
+        it('should optimize for M6, M8, M10 workflow', () => {
+            // Simulate a user who has M6 and M8 in favorites
+            const favorites = [
+                new PitchSetup(
+                    new Gear(module, 20),
+                    new Gear(module, 40),
+                    new Gear(module, 40),
+                    new Gear(module, 80),
+                    new Pitch(1.0, PitchType.Metric) // M6
+                ),
+                new PitchSetup(
+                    new Gear(module, 20),
+                    new Gear(module, 40),
+                    new Gear(module, 40),
+                    new Gear(module, 80),
+                    new Pitch(1.25, PitchType.Metric) // M8
+                )
+            ];
+
+            // Now finding best setup for M10 (1.5 mm/rev)
+            const candidates = [
+                new PitchSetup(
+                    new Gear(module, 20),
+                    new Gear(module, 40),
+                    new Gear(module, 40),
+                    new Gear(module, 80),
+                    new Pitch(1.5, PitchType.Metric) // Uses same gears!
+                ),
+                new PitchSetup(
+                    new Gear(module, 21),
+                    new Gear(module, 45),
+                    new Gear(module, 45),
+                    new Gear(module, 65),
+                    new Pitch(1.5, PitchType.Metric) // Different gears
+                )
+            ];
+
+            const result = GearOptimizer.selectBest(candidates, 1.5, favorites);
+            
+            // Should choose the setup that reuses gears from favorites
+            expect(result?.gearA?.teeth).toBe(20);
+            expect(result?.gearB?.teeth).toBe(40);
+            expect(result?.gearC?.teeth).toBe(40);
+            expect(result?.gearD?.teeth).toBe(80);
+        });
+
+        it('should calculate UNC #0 (80 TPI) correctly with 16 TPI leadscrew', () => {
+            // Setup: Default config with 16 TPI leadscrew
+            const config = new LatheConfig();
+            config.leadscrew = new Pitch(16, PitchType.Imperial);
+
+            // Generate all combinations (synchronous, skip worker)
+            const finder = new CombinationFinder(undefined, true);
+            const combos = finder.findAllCombinations(config);
+
+            console.log(`Generated ${combos.length} combinations`);
+
+            // Find candidates for UNC #0 (80 TPI)
+            const targetPitch = new Pitch(80, PitchType.Imperial);
+            const targetMetric = targetPitch.convert();
+            const thr = 1.003;
+
+            const candidates = combos.filter(s =>
+                s.pitch.value > targetMetric.value / thr &&
+                s.pitch.value < targetMetric.value * thr
+            );
+
+            console.log(`Found ${candidates.length} candidates for UNC #0 (80 TPI)`);
+
+            // Find the best one
+            const best = GearOptimizer.selectBest(candidates, targetMetric.value, []);
+
+            expect(best).not.toBeNull();
+
+            if (best) {
+                console.log(`Best setup: ${best.gearA?.teeth}, ${best.gearB?.teeth}, ${best.gearC?.teeth}, ${best.gearD?.teeth}`);
+                console.log(`Pitch: ${best.pitch.value} mm (${best.pitch.convert().value} TPI)`);
+                console.log(`Error: ${Math.abs(best.pitch.convert().value - 80)} TPI`);
+
+                // Should be very close to 80 TPI
+                const actualTPI = best.pitch.convert().value;
+                expect(Math.abs(actualTPI - 80)).toBeLessThan(0.1);
+            }
+        });
+
+        it('should use batch optimization for multiple imperial threads', () => {
+            // Setup: Default config with 16 TPI leadscrew
+            const config = new LatheConfig();
+            config.leadscrew = new Pitch(16, PitchType.Imperial);
+
+            // Generate all combinations (synchronous, skip worker)
+            const finder = new CombinationFinder(undefined, true);
+            const combos = finder.findAllCombinations(config);
+
+            const thr = 1.003;
+
+            // Collect candidates for multiple threads
+            const threads = [
+                { name: "UNC #0", tpi: 80 },
+                { name: "UNC #1", tpi: 64 },
+                { name: "UNC #2", tpi: 56 }
+            ];
+
+            const batchInput = threads.map(t => {
+                const targetPitch = new Pitch(t.tpi, PitchType.Imperial);
+                const targetMetric = targetPitch.convert();
+                const candidates = combos.filter(s =>
+                    s.pitch.value > targetMetric.value / thr &&
+                    s.pitch.value < targetMetric.value * thr
+                );
+                return {
+                    targetPitch: targetMetric.value,
+                    name: t.name,
+                    candidates
+                };
+            });
+
+            // Batch optimize
+            const results = GearOptimizer.selectBestBatch(batchInput);
+
+            console.log('\nBatch optimization results:');
+            results.forEach(({setup, name}) => {
+                const actualTPI = setup.pitch.convert().value;
+                console.log(`${name}: ${setup.gearA?.teeth}, ${setup.gearB?.teeth}, ${setup.gearC?.teeth}, ${setup.gearD?.teeth} → ${actualTPI.toFixed(3)} TPI`);
+            });
+
+            expect(results.length).toBe(3);
+
+            // All should be very accurate
+            results.forEach(({setup, name}) => {
+                const thread = threads.find(t => t.name === name);
+                const actualTPI = setup.pitch.convert().value;
+                const error = Math.abs(actualTPI - thread!.tpi);
+                console.log(`${name} error: ${error.toFixed(3)} TPI`);
+                expect(error).toBeLessThan(0.1);
+            });
+        });
+    });
+});
+

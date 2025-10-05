@@ -1,5 +1,11 @@
 <template>
-    <div class="box">
+    <div class="box pitch-table-wrapper"
+         :style="{
+           '--gear-a-color': config.gearColors.gearA,
+           '--gear-b-color': config.gearColors.gearB,
+           '--gear-c-color': config.gearColors.gearC,
+           '--gear-d-color': config.gearColors.gearD
+         }">
         <div class="block">
             <p>{{ i18n.ptTitle }}</p>
         </div>
@@ -31,12 +37,15 @@
             </div>
         </div>
         <div class="column no-print">
-            <GeartrainImg 
-                :gear-a="selectedSetup?.gearA ?? undefined" 
-                :gear-b="selectedSetup?.gearB ?? undefined" 
-                :gear-c="selectedSetup?.gearC ?? undefined" 
-                :gear-d="selectedSetup?.gearD ?? undefined" 
+            <GeartrainImg
+                :gear-a="selectedSetup?.gearA ?? undefined"
+                :gear-b="selectedSetup?.gearB ?? undefined"
+                :gear-c="selectedSetup?.gearC ?? undefined"
+                :gear-d="selectedSetup?.gearD ?? undefined"
                 :min-teeth="config.minTeeth"/>
+            <div class="block" style="margin-top: 20px;">
+                <img src="/resources/gears3.svg" alt="Gear diagram" style="width: 100%; max-width: 500px;" />
+            </div>
         </div>
       </div>
     </div>
@@ -55,6 +64,7 @@ import { DeviceHelper } from '@/bll/device';
 import GCDownloader from '@/grid/Downloader';
 import type { GridRowCommandDefinition } from '@rozzy/vue-datagrid/src/GridCommandDefinition';
 import { ref } from 'vue';
+import { GearOptimizer } from '@/bll/gearOptimizer';
 
 class NamedPitchSetup extends PitchSetup {
     public name: string = null!;
@@ -87,22 +97,30 @@ export default {
                     .withFormat(GearHelper.formatFn)
                     .withExportFn(g => g.toString())
                     .withSortForValues(GearHelper.sortFn)
-                    .withStyle("width: 10%").withAlignRight().withHeaderAlignRight(),
+                    .withStyle("width: 10%")
+                    .withCssClasses(['gear-a-color'])
+                    .withAlignRight().withHeaderAlignRight(),
                 new GridColumnDefinition("b", "B", i => i.gearB)
                     .withFormat(GearHelper.formatFn)
                     .withExportFn(g => g.toString())
                     .withSortForValues(GearHelper.sortFn)
-                    .withStyle("width: 10%").withAlignRight().withHeaderAlignRight(),
+                    .withStyle("width: 10%")
+                    .withCssClasses(['gear-b-color'])
+                    .withAlignRight().withHeaderAlignRight(),
                 new GridColumnDefinition("c", "C", i => i.gearC)
                     .withFormat(GearHelper.formatFn)
                     .withExportFn(g => g.toString())
                     .withSortForValues(GearHelper.sortFn)
-                    .withStyle("width: 10%").withAlignRight().withHeaderAlignRight(),
+                    .withStyle("width: 10%")
+                    .withCssClasses(['gear-c-color'])
+                    .withAlignRight().withHeaderAlignRight(),
                 new GridColumnDefinition("d", "D", i => i.gearD)
                     .withFormat(GearHelper.formatFn)
                     .withExportFn(g => g.toString())
                     .withSortForValues(GearHelper.sortFn)
-                    .withStyle("width: 10%").withAlignRight().withHeaderAlignRight(),
+                    .withStyle("width: 10%")
+                    .withCssClasses(['gear-d-color'])
+                    .withAlignRight().withHeaderAlignRight(),
                 new GridColumnDefinition("p", "P", i => i.pitch, i18n.genericPitch)
                     .withFormat(PitchHelper.formatFn)
                     .withStyle("width: 30%").withAlignRight().withHeaderAlignRight(),
@@ -143,16 +161,38 @@ export default {
             t.imperialFineModel = [];
             t.bspModel = [];
 
+            // Get auto-favorite thread names from configuration
+            const autoFavoriteThreads = this.config.autoFavoriteThreads;
+
+            // Collect all auto-favorite candidates for batch optimization
+            const autoFavoriteCandidates: Array<{
+                pitch: Pitch,
+                name: string,
+                candidates: PitchSetup[]
+            }> = [];
+
+            // Calculate best setup for a thread
             function f(p: Pitch, name: string){
                 let type = p.type;
                 p = p.type == PitchType.Metric ? p : p.convert();
                 let n  = t.combos.filter(s => s.pitch.value > p.value / thr && s.pitch.value < p.value * thr);
-                
-                n = n.sort((a,b) => Math.abs(p.value - a.pitch.value) - Math.abs(p.value - b.pitch.value));
 
-                return n.length > 0 
-                    ? NamedPitchSetup.fromSetup(n[0]).withName(name).withType(type)
-                    : null;  
+                // If this is an auto-favorite, collect candidates for batch optimization
+                if(name && autoFavoriteThreads.includes(name)) {
+                    autoFavoriteCandidates.push({
+                        pitch: p,
+                        name: name,
+                        candidates: n
+                    });
+                }
+
+                // For now, just pick the most accurate one for display
+                // (will be replaced by optimized version for auto-favorites)
+                const bestSetup = GearOptimizer.selectBest(n, p.value, []);
+
+                return bestSetup != null
+                    ? NamedPitchSetup.fromSetup(bestSetup).withName(name).withType(type)
+                    : null;
             }
 
             function a(s: NamedPitchSetup | null, arr: NamedPitchSetup[]) {
@@ -194,6 +234,7 @@ export default {
             a(f(new Pitch(1.00, PitchType.Metric), "M10 Super fine"), this.metricSFineModel);
             a(f(new Pitch(1.25, PitchType.Metric), "M12 Super fine"), this.metricSFineModel);
 
+            a(f(new Pitch(80, PitchType.Imperial), "UNC #0"), this.imperialModel);
             a(f(new Pitch(64, PitchType.Imperial), "UNC #1"), this.imperialModel);
             a(f(new Pitch(56, PitchType.Imperial), "UNC #2"), this.imperialModel);
             a(f(new Pitch(48, PitchType.Imperial), "UNC #3"), this.imperialModel);
@@ -217,6 +258,7 @@ export default {
             a(f(new Pitch(7 , PitchType.Imperial), "UNC 1 1/4"), this.imperialModel);
             a(f(new Pitch(6 , PitchType.Imperial), "UNC 1 1/2"), this.imperialModel);
 
+            a(f(new Pitch(72, PitchType.Imperial), "UNF #1"), this.imperialFineModel);
             a(f(new Pitch(64, PitchType.Imperial), "UNF #2"), this.imperialFineModel);
             a(f(new Pitch(56, PitchType.Imperial), "UNF #3"), this.imperialFineModel);
             a(f(new Pitch(48, PitchType.Imperial), "UNF #4"), this.imperialFineModel);
@@ -248,6 +290,28 @@ export default {
             a(f(new Pitch(11, PitchType.Imperial), "G 1 1/4"), this.bspModel);
             a(f(new Pitch(11, PitchType.Imperial), "G 1 1/2"), this.bspModel);
 
+            // Batch optimize auto-favorites
+            // This ensures order doesn't matter and we get the best overall solution
+            if(autoFavoriteCandidates.length > 0) {
+                // Clear ALL favorites before optimization
+                GlobalConfig.clearAllFavorites();
+
+                // Optimize all auto-favorites as a batch
+                const optimizedFavorites = GearOptimizer.selectBestBatch(
+                    autoFavoriteCandidates.map(c => ({
+                        targetPitch: c.pitch.value,
+                        name: c.name,
+                        candidates: c.candidates
+                    }))
+                );
+
+                // Add optimized favorites with names
+                optimizedFavorites.forEach(({setup, name}) => {
+                    const namedSetup = NamedPitchSetup.fromSetup(setup).withName(name);
+                    GlobalConfig.addFavorite(namedSetup);
+                });
+            }
+
             return result;
         },
     },
@@ -263,3 +327,26 @@ export default {
     components: { GeartrainImg, DataGrid }
 }
 </script>
+
+<style>
+/* Gear color classes for PitchTableTab - use CSS variables from wrapper */
+.pitch-table-wrapper .gear-a-color {
+    color: var(--gear-a-color) !important;
+    font-weight: 600 !important;
+}
+
+.pitch-table-wrapper .gear-b-color {
+    color: var(--gear-b-color) !important;
+    font-weight: 600 !important;
+}
+
+.pitch-table-wrapper .gear-c-color {
+    color: var(--gear-c-color) !important;
+    font-weight: 600 !important;
+}
+
+.pitch-table-wrapper .gear-d-color {
+    color: var(--gear-d-color) !important;
+    font-weight: 600 !important;
+}
+</style>

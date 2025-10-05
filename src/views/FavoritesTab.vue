@@ -3,22 +3,26 @@
         <div class="block">{{ i18n.favTitle }}</div>
       <div class="columns">
         <div class="column">
-            <PitchSetupTable 
-                v-model="model" 
-                v-model:orderBy="orderBy" 
-                v-model:orderAscending="orderAscending" 
-                v-model:selectedItem="selectedSetup" 
+            <PitchSetupTable
+                v-model="model"
+                v-model:orderBy="orderBy"
+                v-model:orderAscending="orderAscending"
+                v-model:selectedItem="selectedSetup"
                 :isExportEnabled="true"
                 :isPrintEnabled="true"
+                :showNameColumn="true"
                 :row-commands="rowCommands"/>
         </div>
         <div class="column no-print">
-            <GeartrainImg 
-                :gear-a="selectedSetup?.gearA ?? undefined" 
-                :gear-b="selectedSetup?.gearB ?? undefined" 
-                :gear-c="selectedSetup?.gearC ?? undefined" 
+            <GeartrainImg
+                :gear-a="selectedSetup?.gearA ?? undefined"
+                :gear-b="selectedSetup?.gearB ?? undefined"
+                :gear-c="selectedSetup?.gearC ?? undefined"
                 :gear-d="selectedSetup?.gearD ?? undefined"
                 :min-teeth="config.minTeeth"/>
+            <div class="block" style="margin-top: 20px;">
+                <img src="/resources/gears3.svg" alt="Gear diagram" style="width: 100%; max-width: 500px;" />
+            </div>
         </div>
       </div>
     </div>
@@ -36,13 +40,44 @@ import type { GridRowCommandDefinition } from '@rozzy/vue-datagrid/src/GridComma
 export default {
     data(){
         const rowCommands: GridRowCommandDefinition[] = [new AddToFavoritesRowCommand(), new RemoveFavoriteRowCommand()];
+
+        // Sort favorites by category (metric/imperial), then by thread size
+        const sortedFavorites = [...GlobalConfig.favorites].sort((a, b) => {
+            // Extract category and size from name
+            const getCategory = (name?: string) => {
+                if (!name) return 'zzz'; // No name goes last
+                if (name.startsWith('M')) return 'a-metric'; // M6, M8, M10
+                if (name.startsWith('UNC')) return 'b-unc'; // UNC #0, UNC #1
+                if (name.startsWith('UNF')) return 'c-unf'; // UNF #1, UNF #2
+                if (name.startsWith('BSP')) return 'd-bsp'; // BSP
+                return 'e-other';
+            };
+
+            const getSize = (name?: string) => {
+                if (!name) return 999;
+                // Extract number from name (e.g., "M6" -> 6, "UNC #0" -> 0)
+                const match = name.match(/([0-9]+(?:\.[0-9]+)?)/);
+                return match ? parseFloat(match[1]) : 999;
+            };
+
+            const catA = getCategory(a.name);
+            const catB = getCategory(b.name);
+
+            if (catA !== catB) {
+                return catA.localeCompare(catB);
+            }
+
+            // Same category, sort by size
+            return getSize(a.name) - getSize(b.name);
+        });
+
         return {
             selectedSetup: new PitchSetup(Gear.fromString("M1Z20"), undefined, undefined, Gear.fromString("M1Z80"), new Pitch(1, PitchType.Metric)),
-            orderBy: "pm",
+            orderBy: "name",
             orderAscending: true,
             rowCommands,
             config: GlobalConfig.config,
-            model: GlobalConfig.favorites,
+            model: sortedFavorites,
             i18n: GlobalConfig.i18n
         }
     },

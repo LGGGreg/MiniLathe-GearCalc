@@ -10,6 +10,7 @@ export class PitchSetup {
     public gearB: Gear | undefined;
     public gearC: Gear | undefined;
     public gearD: Gear | undefined;
+    public name?: string; // Optional name for named pitch setups
 
     public constructor(gearA: Gear | undefined, gearB: Gear | undefined, gearC: Gear | undefined, gearD: Gear | undefined, pitch: number | Pitch, pitchType: PitchType = PitchType.Metric) {
         this.gearA = gearA;
@@ -17,20 +18,27 @@ export class PitchSetup {
         this.gearC = gearC;
         this.gearD = gearD;
 
-        if (typeof(pitch) == "number") 
+        if (typeof(pitch) == "number")
             this.pitch = new Pitch(pitch as number, pitchType);
-        else 
+        else
             this.pitch = pitch as Pitch;
     }
 
     public convert(): PitchSetup {
-        return new PitchSetup(
+        const converted = new PitchSetup(
             this.gearA,
-            this.gearB, 
+            this.gearB,
             this.gearC,
             this.gearD,
             this.pitch.convert()
         );
+        converted.name = this.name;
+        return converted;
+    }
+
+    public withName(name: string | undefined): PitchSetup {
+        this.name = name;
+        return this;
     }
 
     public isValid(minTeeth: number): boolean {
@@ -84,13 +92,17 @@ export class PitchSetup {
     }
 
     public toPlainObject(): any {
-        return {
+        const obj: any = {
             gearA: this.gearA?.toString(),
             gearB: this.gearB?.toString(),
             gearC: this.gearC?.toString(),
             gearD: this.gearD?.toString(),
             pitch: this.pitch.toPlainObject(),
         };
+        if (this.name) {
+            obj.name = this.name;
+        }
+        return obj;
     }
 
     public equals(s: PitchSetup) {
@@ -106,12 +118,16 @@ export class PitchSetup {
     }
 
     public static fromPlainObject(o: any): PitchSetup {
-        return new PitchSetup(
-            Gear.fromString(o.gearA)!, 
-            Gear.fromString(o.gearB), 
-            Gear.fromString(o.gearC), 
-            Gear.fromString(o.gearD)!, 
+        const setup = new PitchSetup(
+            Gear.fromString(o.gearA)!,
+            Gear.fromString(o.gearB),
+            Gear.fromString(o.gearC),
+            Gear.fromString(o.gearD)!,
             Pitch.fromPlainObject(o.pitch)!);
+        if (o.name) {
+            setup.name = o.name;
+        }
+        return setup;
     }
 
     public static fromGearsAndLeadscrew(gearA: Gear | undefined, gearB: Gear | undefined, gearC: Gear | undefined, gearD: Gear | undefined, leadscrew: Pitch): PitchSetup {

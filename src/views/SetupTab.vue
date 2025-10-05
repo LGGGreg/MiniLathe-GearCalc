@@ -70,12 +70,19 @@ export default {
             config.geartrainSize = this.geartrainSize;
             GlobalConfig.config = config;
             GlobalConfig.combos = await this.combinator.findAllCombinationsAsync();
+
+            // Clear all favorites so they get recalculated with batch optimization
+            GlobalConfig.clearAllFavorites();
+
+            // Emit event to trigger recalculation in PitchTableTab
+            this.$emit("configSaved");
         },
-        setProgress(b: boolean, p: number) { 
+        setProgress(b: boolean, p: number) {
           this.$emit("update:isBusy", b);
-          this.$emit("update:progress", p); 
+          this.$emit("update:progress", p);
         }
     },
+    emits: ["update:isBusy", "update:progress", "configSaved"],
     components: { GearListEditor, LeadscrewWizard, OtherParamsEditor, LanguageSelector }
 }
 </script>

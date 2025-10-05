@@ -15,12 +15,15 @@
                 :row-commands="rowCommands"/>
         </div>
         <div class="column no-print">
-            <GeartrainImg 
-                :gear-a="selectedSetup?.gearA ?? undefined" 
-                :gear-b="selectedSetup?.gearB ?? undefined" 
-                :gear-c="selectedSetup?.gearC ?? undefined" 
+            <GeartrainImg
+                :gear-a="selectedSetup?.gearA ?? undefined"
+                :gear-b="selectedSetup?.gearB ?? undefined"
+                :gear-c="selectedSetup?.gearC ?? undefined"
                 :gear-d="selectedSetup?.gearD ?? undefined"
                 :min-teeth="config.minTeeth"/>
+            <div class="block" style="margin-top: 20px;">
+                <img src="/resources/gears3.svg" alt="Gear diagram" style="width: 100%; max-width: 500px;" />
+            </div>
         </div>
       </div>
     </div>

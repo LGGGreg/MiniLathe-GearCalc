@@ -24,7 +24,7 @@
       </div>
 
       <section v-if="activeTab == ActiveTabs.Configure" class="box" >
-        <SetupTab v-model:isBusy="isLoading" v-model:progress="loadingProgress" :key="i"/>
+        <SetupTab v-model:isBusy="isLoading" v-model:progress="loadingProgress" @configSaved="onConfigSaved" :key="i"/>
       </section>
       <section v-if="activeTab == ActiveTabs.PitchTable" class="" >
         <PitchTableTab :key="i" />
@@ -99,13 +99,20 @@ export default {
         };
     },
     methods: {
-      setProgress(l: boolean, p: number) { this.isLoading = l; this.loadingProgress = p; }
+      setProgress(l: boolean, p: number) { this.isLoading = l; this.loadingProgress = p; },
+      onConfigSaved() {
+        // Force re-render of all tabs to reflect new config
+        this.i++;
+      }
     },
     async mounted() {
       if(GlobalConfig.combos.length == 0 && GlobalConfig.config.gears.length > 2)
       {
           (async () => {
             GlobalConfig.combos = await this.combinator.findAllCombinationsAsync();
+            // Clear favorites so they get recalculated with batch optimization
+            // when PitchTableTab is first visited
+            GlobalConfig.clearAllFavorites();
             this.i++;}
           )()
       }
