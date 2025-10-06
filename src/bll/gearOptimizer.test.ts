@@ -409,6 +409,57 @@ describe('GearOptimizer', () => {
             });
         });
 
+        it('should be order-independent (same result regardless of input order)', () => {
+            const config = new LatheConfig();
+            config.leadscrew = new Pitch(16, PitchType.Imperial);
+            const finder = new CombinationFinder(undefined, true);
+            const combos = finder.findAllCombinations(config);
+            const thr = 1.003;
+
+            // Define threads in different orders
+            const threads = [
+                { name: "UNC #0", tpi: 80 },
+                { name: "UNC #1", tpi: 64 },
+                { name: "UNC #2", tpi: 56 }
+            ];
+
+            const createBatchInput = (order: number[]) => {
+                return order.map(idx => {
+                    const t = threads[idx];
+                    const targetPitch = new Pitch(t.tpi, PitchType.Imperial);
+                    const targetMetric = targetPitch.convert();
+                    const candidates = combos.filter(s =>
+                        s.pitch.value > targetMetric.value / thr &&
+                        s.pitch.value < targetMetric.value * thr
+                    );
+                    return { targetPitch: targetMetric.value, name: t.name, candidates };
+                });
+            };
+
+            // Test with 3 different orders
+            const result1 = GearOptimizer.selectBestBatch(createBatchInput([0, 1, 2]));
+            const result2 = GearOptimizer.selectBestBatch(createBatchInput([2, 0, 1]));
+            const result3 = GearOptimizer.selectBestBatch(createBatchInput([1, 2, 0]));
+
+            // Extract setups by name
+            const getSetup = (results: any[], name: string) => results.find(r => r.name === name)?.setup;
+
+            const unc0_1 = getSetup(result1, 'UNC #0');
+            const unc0_2 = getSetup(result2, 'UNC #0');
+            const unc0_3 = getSetup(result3, 'UNC #0');
+
+            console.log('\nOrder-independence test:');
+            console.log(`Order [0,1,2]: UNC #0 = ${unc0_1?.gearA?.teeth}, ${unc0_1?.gearB?.teeth}, ${unc0_1?.gearC?.teeth}, ${unc0_1?.gearD?.teeth}`);
+            console.log(`Order [2,0,1]: UNC #0 = ${unc0_2?.gearA?.teeth}, ${unc0_2?.gearB?.teeth}, ${unc0_2?.gearC?.teeth}, ${unc0_2?.gearD?.teeth}`);
+            console.log(`Order [1,2,0]: UNC #0 = ${unc0_3?.gearA?.teeth}, ${unc0_3?.gearB?.teeth}, ${unc0_3?.gearC?.teeth}, ${unc0_3?.gearD?.teeth}`);
+
+            // All three orders should produce the same result for UNC #0
+            expect(unc0_1?.gearA?.teeth).toBe(unc0_2?.gearA?.teeth);
+            expect(unc0_1?.gearA?.teeth).toBe(unc0_3?.gearA?.teeth);
+            expect(unc0_1?.gearB?.teeth).toBe(unc0_2?.gearB?.teeth);
+            expect(unc0_1?.gearB?.teeth).toBe(unc0_3?.gearB?.teeth);
+        });
+
         it('should find simplified 2-gear setups from CSV', () => {
             // Test some of the "ANY" setups from the CSV
             const config = new LatheConfig();

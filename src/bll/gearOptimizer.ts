@@ -15,11 +15,71 @@ export class GearOptimizer {
 
     /**
      * Select the best gear combinations for multiple threads as a batch
-     * This ensures order doesn't matter and we get the best overall solution
+     * Uses iterative improvement to avoid path dependency
      * @param threads - Array of thread definitions with candidates
      * @returns Array of optimized PitchSetup objects (caller should add names)
      */
     public static selectBestBatch(
+        threads: Array<{
+            targetPitch: number,
+            name: string,
+            candidates: PitchSetup[]
+        }>
+    ): Array<{setup: PitchSetup, name: string}> {
+        if (threads.length === 0) return [];
+
+        // Phase 1: Generate initial solution using greedy algorithm
+        const initial = this.generateGreedySolution(threads);
+
+        // Phase 2: Iterative improvement (hill climbing)
+        // Try swapping each thread's setup with alternatives to improve total score
+        let current = initial;
+        let improved = true;
+        let iterations = 0;
+        const maxIterations = 10; // Prevent infinite loops
+
+        while (improved && iterations < maxIterations) {
+            improved = false;
+            iterations++;
+
+            const currentScore = this.calculateTotalScore(current, threads);
+
+            // Try improving each thread's selection
+            for (let i = 0; i < threads.length; i++) {
+                const thread = threads[i];
+                const currentSetup = current[i].setup;
+
+                // Try each alternative candidate
+                for (const candidate of thread.candidates) {
+                    if (candidate === currentSetup) continue;
+
+                    // Create new solution with this candidate
+                    const newSolution = [...current];
+                    newSolution[i] = {setup: candidate, name: thread.name};
+
+                    // Calculate new total score
+                    const newScore = this.calculateTotalScore(newSolution, threads);
+
+                    // If better, accept it and continue improving
+                    if (newScore > currentScore) {
+                        current = newSolution;
+                        improved = true;
+                        console.log(`[GearOptimizer] Improved ${thread.name}: score ${currentScore.toFixed(0)} → ${newScore.toFixed(0)}`);
+                        break; // Move to next thread
+                    }
+                }
+            }
+        }
+
+        console.log(`[GearOptimizer] Batch optimization completed in ${iterations} iterations`);
+        return current;
+    }
+
+    /**
+     * Generate initial solution using greedy algorithm
+     * This provides a good starting point for iterative improvement
+     */
+    private static generateGreedySolution(
         threads: Array<{
             targetPitch: number,
             name: string,
@@ -50,6 +110,30 @@ export class GearOptimizer {
         }
 
         return result;
+    }
+
+    /**
+     * Calculate total score for entire solution
+     * This considers gear reuse and position consistency across ALL setups
+     */
+    private static calculateTotalScore(
+        solution: Array<{setup: PitchSetup, name: string}>,
+        threads: Array<{targetPitch: number, name: string, candidates: PitchSetup[]}>
+    ): number {
+        let total = 0;
+        const allSetups = solution.map(s => s.setup);
+
+        for (let i = 0; i < solution.length; i++) {
+            const setup = solution[i].setup;
+            const thread = threads.find(t => t.name === solution[i].name);
+            if (!thread) continue;
+
+            // Score this setup considering ALL other setups (not just previous ones)
+            const otherSetups = allSetups.filter((_, idx) => idx !== i);
+            total += this.calculateScore(setup, thread.targetPitch, otherSetups);
+        }
+
+        return total;
     }
 
     /**
