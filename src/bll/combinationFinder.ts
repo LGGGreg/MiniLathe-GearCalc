@@ -31,9 +31,13 @@ export default class CombinationFinder {
         const millis = Date.now();
         const gears = config.gears.slice().sort((a,b) => Gears.compare(a, b));
 
+        // Create a set of available gear teeth for quick lookup
+        const availableGearTeeth = new Set(gears.map(g => g.teeth));
+
         function key(ka: Gear, kb: Gear, kc: Gear, kd: Gear){
-            if (Gears.equal(kb, kc))
-                return "G"+ka.toString()+"--G"+kd.toString();
+            // Always include all gears in the key, even when B=C
+            // Different B=C combinations (e.g., 40,48,48,30 vs 40,65,65,30) produce the same ratio
+            // but may have different physical constraints (clearance, interference)
             return "G"+ka.toString()+"G"+kb.toString()+"G"+kc.toString()+"G"+kd.toString();
         }
 
@@ -61,14 +65,14 @@ export default class CombinationFinder {
                         const gd = gears[d];
 
                         const k = key(ga, gb, gc, gd);
-                        if (comboDict[k] != null) 
+                        if (comboDict[k] != null)
                             continue;
 
                         const ps = this.findMetricPitch(ga, gb, gc, gd, config.leadscrew);
                         if(!ps.isValid(config.minTeeth))
                             continue;
                         comboDict[k] = ps;
-                    }                    
+                    }
                 }
             }
                 this.progressFn(true, a / gears.length);
@@ -81,6 +85,27 @@ export default class CombinationFinder {
         {
             allCombos.push(comboDict[i]);
         }
+
+        // Post-processing: Replace unavailable gear C with placeholder
+        // This handles cases where the optimal gear C is not in our collection
+        allCombos = allCombos.map(combo => {
+            // If gear C is not available and B != C (not simplified 2-gear)
+            if (combo.gearC && combo.gearB &&
+                !Gears.equal(combo.gearB, combo.gearC) &&
+                !availableGearTeeth.has(combo.gearC.teeth)) {
+                // Replace with placeholder gear
+                console.log(`[CombinationFinder] Replacing unavailable gear C (${combo.gearC.teeth}T) with placeholder (${config.placeholderGearC.teeth}T)`);
+                return new PitchSetup(
+                    combo.gearA,
+                    combo.gearB,
+                    config.placeholderGearC,
+                    combo.gearD,
+                    combo.pitch
+                );
+            }
+            return combo;
+        });
+
         allCombos = allCombos.sort((a,b) => a.pitch.value - b.pitch.value);
 
         console.info(`[[CobinationFinder]] Gear combos found: ${allCombos.length} in ${Date.now()-millis}ms`);

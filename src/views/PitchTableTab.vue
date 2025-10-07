@@ -6,6 +6,13 @@
            '--gear-c-color': config.gearColors.gearC,
            '--gear-d-color': config.gearColors.gearD
          }">
+        <!-- Recalculation Banner -->
+        <RecalculationBanner
+            ref="recalcBanner"
+            @recalculate="handleRecalculation"
+            message="Settings have changed. Recalculate favorites for optimal gear combinations?"
+            buttonText="Recalculate Favorites" />
+
         <div class="block">
             <p>{{ i18n.ptTitle }}</p>
         </div>
@@ -58,6 +65,7 @@ import GlobalConfig from '@/bll/globalConfig';
 import DataGrid, { GridSelectionMode } from '@rozzy/vue-datagrid/src/DataGrid.vue';
 import { GridColumnDefinition } from '@rozzy/vue-datagrid/src/GridColumnDefinition';
 import { AddToFavoritesRowCommand, RemoveFavoriteRowCommand } from '@/components/PitchSetupTable.vue';
+import RecalculationBanner from '@/components/RecalculationBanner.vue';
 import { Gear } from '@/bll/gear';
 import { GearHelper, PitchHelper } from '@/components/gridHelpers';
 import { DeviceHelper } from '@/bll/device';
@@ -65,6 +73,7 @@ import GCDownloader from '@/grid/Downloader';
 import type { GridRowCommandDefinition } from '@rozzy/vue-datagrid/src/GridCommandDefinition';
 import { ref } from 'vue';
 import { GearOptimizer } from '@/bll/gearOptimizer';
+import { WorkerClient } from '@/bll/backgroundWorker';
 
 class NamedPitchSetup extends PitchSetup {
     public name: string = null!;
@@ -89,7 +98,14 @@ export default {
     data(){
         const i18n = GlobalConfig.i18n;
         const downloader = new GCDownloader();
+
+        // Create worker client for recalculation
+        // Note: Worker client is created without progress callback initially
+        // The progress callback will be set dynamically in handleRecalculation
+        const recalcWorkerClient = new WorkerClient<PitchSetup[]>();
+
         return {
+            recalcWorkerClient,
             selectedSetup: new NamedPitchSetup(Gear.fromString("M1Z20"), undefined, undefined, Gear.fromString("M1Z80"), new Pitch(1, PitchType.Metric)),
             cols: [
                 new GridColumnDefinition("name", i18n.ptName, i => i.name),
@@ -132,7 +148,6 @@ export default {
             imperialModel: [] as NamedPitchSetup[],
             imperialFineModel: [] as NamedPitchSetup[],
             bspModel: [] as NamedPitchSetup[],
-            combos: GlobalConfig.combos,
             rowCommands: [new AddToFavoritesRowCommand(), new RemoveFavoriteRowCommand()] as GridRowCommandDefinition[],
             isExportEnabled: true,
             config: GlobalConfig.config,
@@ -149,6 +164,181 @@ export default {
         this.isPrintEnabled = !await DeviceHelper.isNativeApp();
     },
     methods: {
+        async handleRecalculation(progressCallback: (progress: number) => void) {
+            console.log('[PitchTableTab] handleRecalculation called, progressCallback:', typeof progressCallback);
+            try {
+                console.log('[PitchTableTab] Calling progressCallback(5)');
+                progressCallback(5);
+
+                console.log('[PitchTableTab] Starting background recalculation...');
+
+                // Create worker with progress callback
+                const workerPath = import.meta.env.DEV
+                    ? '/src/workers/recalculation.ts'
+                    : '/recalculation.js';
+
+                this.recalcWorkerClient.createWorker(
+                    workerPath,
+                    (data: any) => data?.map((i: any) => PitchSetup.fromPlainObject(i)),
+                    (working: boolean, progress: number | undefined) => {
+                        console.log('[PitchTableTab] Worker progress:', working, progress);
+                        if (progress !== undefined) {
+                            // Map worker progress (0-1) to percentage (0-100)
+                            // Reserve 5-30% for setup, 30-95% for worker, 95-100% for finalization
+                            const workerProgress = 30 + (progress * 65);
+                            progressCallback(workerProgress);
+                        }
+                    }
+                );
+
+                // Collect auto-favorite candidates (same logic as computeModel)
+                const autoFavoriteThreads = this.config.autoFavoriteThreads;
+                const autoFavoriteCandidates: Array<{
+                    pitch: Pitch,
+                    originalPitchType: PitchType,
+                    name: string,
+                    candidates: PitchSetup[]
+                }> = [];
+
+                const thr = 1.003;
+                const t = this;
+
+                // Helper function to collect candidates
+                function collectCandidates(p: Pitch, name: string) {
+                    const originalPitchType = p.type;
+                    p = p.type == PitchType.Metric ? p : p.convert();
+                    let n = t.combos.filter(s => s.pitch.value > p.value / thr && s.pitch.value < p.value * thr);
+
+                    if(name && autoFavoriteThreads.includes(name)) {
+                        autoFavoriteCandidates.push({
+                            pitch: p,
+                            originalPitchType: originalPitchType,
+                            name: name,
+                            candidates: n
+                        });
+                    }
+                }
+
+                // Collect all thread candidates (same as computeModel)
+                // Metric coarse
+                collectCandidates(new Pitch(0.4, PitchType.Metric), "M2");
+                collectCandidates(new Pitch(0.45, PitchType.Metric), "M2.5");
+                collectCandidates(new Pitch(0.5, PitchType.Metric), "M3");
+                collectCandidates(new Pitch(0.7, PitchType.Metric), "M4");
+                collectCandidates(new Pitch(0.8, PitchType.Metric), "M5");
+                collectCandidates(new Pitch(1.0, PitchType.Metric), "M6");
+                collectCandidates(new Pitch(1.25, PitchType.Metric), "M8");
+                collectCandidates(new Pitch(1.5, PitchType.Metric), "M10");
+                collectCandidates(new Pitch(1.75, PitchType.Metric), "M12");
+                collectCandidates(new Pitch(2.0, PitchType.Metric), "M14");
+                collectCandidates(new Pitch(2.0, PitchType.Metric), "M16");
+                collectCandidates(new Pitch(2.5, PitchType.Metric), "M20");
+
+                // Metric fine
+                collectCandidates(new Pitch(1.0, PitchType.Metric), "M8 Fine");
+                collectCandidates(new Pitch(1.25, PitchType.Metric), "M10 Fine");
+                collectCandidates(new Pitch(1.25, PitchType.Metric), "M12 Fine");
+                collectCandidates(new Pitch(1.5, PitchType.Metric), "M16 Fine");
+                collectCandidates(new Pitch(1.5, PitchType.Metric), "M20 Fine");
+                collectCandidates(new Pitch(2.0, PitchType.Metric), "M24 Fine");
+                collectCandidates(new Pitch(2.0, PitchType.Metric), "M30 Fine");
+
+                // Imperial UNC
+                collectCandidates(new Pitch(80, PitchType.Imperial), "UNC #0");
+                collectCandidates(new Pitch(64, PitchType.Imperial), "UNC #1");
+                collectCandidates(new Pitch(56, PitchType.Imperial), "UNC #2");
+                collectCandidates(new Pitch(48, PitchType.Imperial), "UNC #3");
+                collectCandidates(new Pitch(40, PitchType.Imperial), "UNC #4");
+                collectCandidates(new Pitch(40, PitchType.Imperial), "UNC #5");
+                collectCandidates(new Pitch(32, PitchType.Imperial), "UNC #6");
+                collectCandidates(new Pitch(32, PitchType.Imperial), "UNC #8");
+                collectCandidates(new Pitch(24, PitchType.Imperial), "UNC #10");
+                collectCandidates(new Pitch(24, PitchType.Imperial), "UNC #12");
+                collectCandidates(new Pitch(20, PitchType.Imperial), "UNC 1/4");
+                collectCandidates(new Pitch(18, PitchType.Imperial), "UNC 5/16");
+                collectCandidates(new Pitch(16, PitchType.Imperial), "UNC 3/8");
+                collectCandidates(new Pitch(14, PitchType.Imperial), "UNC 7/16");
+                collectCandidates(new Pitch(13, PitchType.Imperial), "UNC 1/2");
+                collectCandidates(new Pitch(12, PitchType.Imperial), "UNC 9/16");
+                collectCandidates(new Pitch(11, PitchType.Imperial), "UNC 5/8");
+                collectCandidates(new Pitch(9, PitchType.Imperial), "UNC 7/8");
+                collectCandidates(new Pitch(8, PitchType.Imperial), "UNC 1");
+
+                // Imperial UNF
+                collectCandidates(new Pitch(72, PitchType.Imperial), "UNF #1");
+                collectCandidates(new Pitch(64, PitchType.Imperial), "UNF #2");
+                collectCandidates(new Pitch(56, PitchType.Imperial), "UNF #3");
+                collectCandidates(new Pitch(48, PitchType.Imperial), "UNF #4");
+                collectCandidates(new Pitch(44, PitchType.Imperial), "UNF #5");
+                collectCandidates(new Pitch(40, PitchType.Imperial), "UNF #6");
+                collectCandidates(new Pitch(36, PitchType.Imperial), "UNF #8");
+                collectCandidates(new Pitch(32, PitchType.Imperial), "UNF #10");
+                collectCandidates(new Pitch(28, PitchType.Imperial), "UNF #12");
+                collectCandidates(new Pitch(28, PitchType.Imperial), "UNF 1/4");
+                collectCandidates(new Pitch(24, PitchType.Imperial), "UNF 5/16");
+                collectCandidates(new Pitch(24, PitchType.Imperial), "UNF 3/8");
+                collectCandidates(new Pitch(20, PitchType.Imperial), "UNF 7/16");
+                collectCandidates(new Pitch(20, PitchType.Imperial), "UNF 1/2");
+                collectCandidates(new Pitch(18, PitchType.Imperial), "UNF 9/16");
+                collectCandidates(new Pitch(18, PitchType.Imperial), "UNF 5/8");
+                collectCandidates(new Pitch(16, PitchType.Imperial), "UNF 3/4");
+                collectCandidates(new Pitch(14, PitchType.Imperial), "UNF 7/8");
+                collectCandidates(new Pitch(12, PitchType.Imperial), "UNF 1");
+                collectCandidates(new Pitch(12, PitchType.Imperial), "UNF 1 1/8");
+                collectCandidates(new Pitch(12, PitchType.Imperial), "UNF 1 1/4");
+
+                progressCallback(20);
+
+                console.log(`[PitchTableTab] Collected ${autoFavoriteCandidates.length} thread candidates`);
+
+                // Prepare data for worker
+                const workerInput = {
+                    threads: autoFavoriteCandidates.map(t => ({
+                        targetPitch: t.pitch.value,
+                        name: t.name,
+                        originalPitchType: t.originalPitchType,
+                        candidates: t.candidates.map(c => c.toPlainObject())
+                    }))
+                };
+
+                progressCallback(30);
+
+                // Run worker with longer timeout (60 seconds)
+                console.log('[PitchTableTab] Calling runWorker...');
+                const optimizedFavorites = await this.recalcWorkerClient.runWorker(workerInput, 60000);
+
+                console.log('[PitchTableTab] runWorker returned, type:', typeof optimizedFavorites, 'value:', optimizedFavorites);
+                progressCallback(80);
+
+                console.log(`[PitchTableTab] Worker returned ${optimizedFavorites?.length ?? 'undefined'} optimized favorites`);
+
+                // Clear auto-favorites and add new ones
+                GlobalConfig.clearAutoFavorites();
+
+                if (Array.isArray(optimizedFavorites)) {
+                    console.log('[PitchTableTab] Adding', optimizedFavorites.length, 'favorites...');
+                    optimizedFavorites.forEach(setup => {
+                        GlobalConfig.addFavorite(setup);
+                    });
+                    console.log('[PitchTableTab] Favorites added, total favorites now:', GlobalConfig.favorites.length);
+                } else {
+                    console.error('[PitchTableTab] optimizedFavorites is not an array!', optimizedFavorites);
+                }
+
+                progressCallback(95);
+
+                // Small delay to show completion
+                await new Promise(resolve => setTimeout(resolve, 200));
+
+                progressCallback(100);
+
+                console.log('[PitchTableTab] Recalculation complete');
+            } catch (error) {
+                console.error('[PitchTableTab] Recalculation error:', error);
+                progressCallback(100); // Complete even on error
+            }
+        },
+
         computeModel() {
             const result: NamedPitchSetup[] = [];
             const thr = 1.003;
@@ -293,57 +483,29 @@ export default {
             a(f(new Pitch(11, PitchType.Imperial), "G 1 1/4"), this.bspModel);
             a(f(new Pitch(11, PitchType.Imperial), "G 1 1/2"), this.bspModel);
 
-            // Batch optimize auto-favorites
-            // This ensures order doesn't matter and we get the best overall solution
-            if(autoFavoriteCandidates.length > 0) {
-                // Clear ALL favorites before optimization
-                GlobalConfig.clearAllFavorites();
-
-                // Optimize all auto-favorites as a batch
-                const optimizedFavorites = GearOptimizer.selectBestBatch(
-                    autoFavoriteCandidates.map(c => ({
-                        targetPitch: c.pitch.value,
-                        name: c.name,
-                        candidates: c.candidates
-                    }))
-                );
-
-                // Add optimized favorites with names, preserving original pitch type
-                optimizedFavorites.forEach(({setup, name}) => {
-                    // Find the original pitch type for this thread
-                    const originalCandidate = autoFavoriteCandidates.find(c => c.name === name);
-                    const originalPitchType = originalCandidate?.originalPitchType;
-
-                    // Convert pitch to original type if needed
-                    let finalSetup = setup;
-                    if (originalPitchType !== undefined && setup.pitch.type !== originalPitchType) {
-                        finalSetup = new PitchSetup(
-                            setup.gearA,
-                            setup.gearB,
-                            setup.gearC,
-                            setup.gearD,
-                            setup.pitch.convert()
-                        );
-                    }
-
-                    const namedSetup = NamedPitchSetup.fromSetup(finalSetup).withName(name);
-                    GlobalConfig.addFavorite(namedSetup);
-                });
-            }
+            // DON'T run batch optimization here - it locks up the browser!
+            // Instead, the user will click "Recalculate Favorites" button
+            // which runs optimization in a background worker
+            console.log('[PitchTableTab] computeModel: Collected', autoFavoriteCandidates.length, 'auto-favorite candidates');
+            console.log('[PitchTableTab] computeModel: Use "Recalculate Favorites" button to optimize');
 
             return result;
         },
     },
     computed: {
+        combos() {
+            // Always reference GlobalConfig.combos so updates are reflected
+            return GlobalConfig.combos;
+        },
         selectedItems: {
             get(): NamedPitchSetup[] { return [this.selectedSetup]; },
             set(v: NamedPitchSetup[]) { this.selectedSetup = v[0]; }
-        },        
+        },
         isMultiModule() {
-            return this.config.isMultiModule; 
+            return this.config.isMultiModule;
         }
     },
-    components: { GeartrainImg, DataGrid }
+    components: { GeartrainImg, DataGrid, RecalculationBanner }
 }
 </script>
 

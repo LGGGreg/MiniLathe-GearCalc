@@ -61,7 +61,6 @@ export default {
             comboFinder: new CombinationFinder(),
             defaultModule: GearModule.fromString("M1"),
             config: GlobalConfig.config,
-            combos: GlobalConfig.combos,
             i18n: GlobalConfig.i18n,
         }
     },
@@ -72,6 +71,10 @@ export default {
         gearD: {type: Gear}
     },
     computed: {
+        combos() {
+            // Always reference GlobalConfig.combos so updates are reflected
+            return GlobalConfig.combos;
+        },
         filter() {
             const t = this;
             return {

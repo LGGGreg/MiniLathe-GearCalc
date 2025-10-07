@@ -68,13 +68,12 @@ export default {
             config.minTeeth = this.distance;
             config.maxSize = this.maxSize;
             config.geartrainSize = this.geartrainSize;
+
+            // Setting config will automatically set needsRecalculation flag if changes detected
             GlobalConfig.config = config;
             GlobalConfig.combos = await this.combinator.findAllCombinationsAsync();
 
-            // Clear all favorites so they get recalculated with batch optimization
-            GlobalConfig.clearAllFavorites();
-
-            // Emit event to trigger recalculation in PitchTableTab
+            // Emit event to trigger recalculation banner
             this.$emit("configSaved");
         },
         setProgress(b: boolean, p: number) {

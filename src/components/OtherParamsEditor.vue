@@ -91,6 +91,11 @@ export default {
             this.isEditMode = true;
             this.distanceValue = this.distance;
             this.maxSizeValue = this.maxSize;
+            this.geartrainSizeValue = this.geartrainSize;
+            // Reset validation state when entering edit mode
+            this.isDistanceValid = true;
+            this.isMaxSizeValid = true;
+            this.isGeartrainSizeValid = true;
         }
     },
     props: {

@@ -48,7 +48,6 @@ export default {
             isPitchValid: true,
             rowCommands: [new AddToFavoritesRowCommand(), new RemoveFavoriteRowCommand()],
             config: GlobalConfig.config,
-            combos: GlobalConfig.combos,
             i18n: GlobalConfig.i18n
         }
     },
@@ -56,6 +55,10 @@ export default {
         desiredPitch: { type: Pitch, default: new Pitch(1, PitchType.Metric) }
     },
     computed: {
+        combos() {
+            // Always reference GlobalConfig.combos so updates are reflected
+            return GlobalConfig.combos;
+        },
         filter() {
             const t = this;
             return {

@@ -110,9 +110,14 @@ export default {
       {
           (async () => {
             GlobalConfig.combos = await this.combinator.findAllCombinationsAsync();
-            // Clear favorites so they get recalculated with batch optimization
-            // when PitchTableTab is first visited
-            GlobalConfig.clearAllFavorites();
+
+            // DON'T clear auto-favorites here!
+            // Auto-favorites should only be cleared when the user explicitly clicks
+            // "Recalculate Favorites" in the Pitch Table tab (which calls clearAutoFavorites).
+            // Clearing them here would delete favorites on every app load!
+
+            // Set flag to trigger recalculation banner so user knows to generate favorites
+            GlobalConfig.setNeedsRecalculation(true);
             this.i++;}
           )()
       }

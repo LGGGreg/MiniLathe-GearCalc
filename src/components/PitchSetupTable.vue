@@ -105,10 +105,22 @@ export default {
                 .withStyle("width: 10%")
                 .withCssClasses(['gear-b-color'])
                 .withAlignRight().withHeaderAlignRight(),
-            new GridColumnDefinition("c", "C", i => i.gearC)
-                .withFormat(g => GearHelper.formatFn(g, () => this.hideModules))
-                .withExportFn(g => g.toString())
-                .withSortForValues(GearHelper.sortFn)
+            new GridColumnDefinition("c", "C", i => {
+                // Return object with gear and flag indicating if B=C
+                const isBEqualsC = i.gearB && i.gearC &&
+                    i.gearB.teeth === i.gearC.teeth &&
+                    i.gearB.module.value === i.gearC.module.value;
+                return { gear: i.gearC, isBEqualsC };
+            })
+                .withFormat(obj => {
+                    // Show blank if gear C equals gear B (simplified 2-gear setup)
+                    if (obj?.isBEqualsC) {
+                        return "";
+                    }
+                    return GearHelper.formatFn(obj?.gear, () => this.hideModules);
+                })
+                .withExportFn(obj => obj?.gear?.toString() ?? "")
+                .withSortForValues((a, b) => GearHelper.sortFn(a?.gear, b?.gear))
                 .withStyle("width: 10%")
                 .withCssClasses(['gear-c-color'])
                 .withAlignRight().withHeaderAlignRight(),

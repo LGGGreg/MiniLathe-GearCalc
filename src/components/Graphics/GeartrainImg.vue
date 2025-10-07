@@ -102,7 +102,8 @@
                 <GearImg class="gear" :cx="spindlePos.x" :cy="spindlePos.y" :gear="ga" :sizeText="true" :textRotation="180" :gearColor="gearColors.gearA" gearId="A"/>
                 <ellipse class="axle" :cx="spindlePos.x " :cy="spindlePos.y " :rx="4 " :ry="4 "/>
                 <GearImg class="gear" :cx="midAxlePos.x" :cy="midAxlePos.y" :gear="gb" :sizeText="true"  :textRotation="90" :gearColor="gearColors.gearB" gearId="B"/>
-                <GearImg class="gear" :cx="midAxlePos.x" :cy="midAxlePos.y" :gear="gc" :class="{trans: gearCLargerThanB}" :sizeText="true"  :textRotation="90" :gearColor="gearColors.gearC" gearId="C"/>
+                <!-- Hide gear C when B=C (simplified 2-gear setup), show gear B (green) instead -->
+                <GearImg v-if="!isBEqualsC" class="gear" :cx="midAxlePos.x" :cy="midAxlePos.y" :gear="gc" :class="{trans: gearCLargerThanB}" :sizeText="true"  :textRotation="90" :gearColor="gearColors.gearC" gearId="C"/>
                 <ellipse class="axle" :cx="midAxlePos.x " :cy="midAxlePos.y " :rx="4 " :ry="4 "/>
                 <GearImg class="gear" :cx="leadscrewPos.x" :cy="leadscrewPos.y" :gear="gd" :class="{trans: gearCSmallerThanB}" :sizeText="true" :textRotation="-90" :gearColor="gearColors.gearD" gearId="D"/>
                 <ellipse class="axle" :cx="leadscrewPos.x " :cy="leadscrewPos.y " :rx="4 " :ry="4 "/>
@@ -137,7 +138,11 @@ export default {
         gd() { return this.gearD == undefined ? Gear.fromString("M1Z80")! : this.gearD; },
         angle() { return this.leadscrewPos.sub(this.midAxlePos).angle(); },
         gearCLargerThanB() { return Gears.pitchRadius(this.gc)! > Gears.pitchRadius(this.gb)!; },
-        gearCSmallerThanB() { return Gears.pitchRadius(this.gc)! < Gears.pitchRadius(this.gb)!; }
+        gearCSmallerThanB() { return Gears.pitchRadius(this.gc)! < Gears.pitchRadius(this.gb)!; },
+        isBEqualsC() {
+            // Check if B and C are the same gear (simplified 2-gear setup)
+            return this.gearB && this.gearC && Gears.equal(this.gearB, this.gearC);
+        }
     },
     methods: {
         calculateMidAxlePos(): Vector {

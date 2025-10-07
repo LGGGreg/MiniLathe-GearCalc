@@ -8,6 +8,10 @@ export default class LatheConfig {
     public geartrainSize: number = 2;
     public gears: Gear[] = Gears.listFromTeeth([20,20,20,21,25,30,35,40,40,45,45,48,50,50,54,55,57,60,60,65,72,80,80], GearModule.fromString("M1")!);
 
+    // Placeholder gear for position C when gear is not available
+    // Used when C is not connected (simplified 2-gear setup or unavailable gear)
+    public placeholderGearC: Gear = new Gear(20, GearModule.fromString("M1")!);
+
     // Auto-favorite configuration - now using thread names instead of TPI/pitch values
     public autoFavoriteThreads: string[] = [
         // Imperial UNC
@@ -61,7 +65,8 @@ export default class LatheConfig {
             maxSize: this.maxSize,
             geartrainSize: this.geartrainSize,
             autoFavoriteThreads: this.autoFavoriteThreads,
-            gearColors: this.gearColors
+            gearColors: this.gearColors,
+            placeholderGearC: this.placeholderGearC.toString()
         };
     }
 
@@ -83,6 +88,11 @@ export default class LatheConfig {
         // Load gear colors with defaults if not present
         if (o.gearColors) {
             result.gearColors = o.gearColors;
+        }
+
+        // Load placeholder gear C with default if not present
+        if (o.placeholderGearC) {
+            result.placeholderGearC = Gear.fromString(o.placeholderGearC);
         }
 
         return result;

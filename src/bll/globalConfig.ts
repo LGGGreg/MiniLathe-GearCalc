@@ -23,8 +23,24 @@ export default class GlobalConfig {
     }
 
     public static set config(v: LatheConfig) {
+        // Check if significant changes occurred
+        const oldConfig = this._config;
+        const hasSignificantChanges = oldConfig && (
+            oldConfig.leadscrew.value !== v.leadscrew.value ||
+            oldConfig.leadscrew.type !== v.leadscrew.type ||
+            oldConfig.minTeeth !== v.minTeeth ||
+            oldConfig.gears.length !== v.gears.length ||
+            JSON.stringify(oldConfig.gears.map(g => g.toString()).sort()) !==
+            JSON.stringify(v.gears.map(g => g.toString()).sort())
+        );
+
         this._config = v;
         this.saveConfig();
+
+        // Set recalculation flag if significant changes detected
+        if (hasSignificantChanges) {
+            this.setNeedsRecalculation(true);
+        }
     }
 
     private static async loadConfig(): Promise<LatheConfig> {
@@ -88,6 +104,10 @@ export default class GlobalConfig {
         if(existingIndex == -1){
             this._favorites.push(s);
             this.saveFavorites();
+            // Set flag for manual favorites (auto-favorites are added during recalculation)
+            if (!s.name) {
+                this.setNeedsRecalculation(true);
+            }
         } else if (s.name) {
             // Update existing auto-favorite with better gear combination
             this._favorites[existingIndex] = s;
@@ -99,8 +119,14 @@ export default class GlobalConfig {
         const i = this.indexOfFavorite(s);
         if(i == -1) return;
 
+        const removed = this._favorites[i];
         this._favorites = this._favorites.slice(0, i).concat(this._favorites.slice(i+1));
         this.saveFavorites();
+
+        // Set flag for manual favorites (auto-favorites are removed during recalculation)
+        if (!removed.name) {
+            this.setNeedsRecalculation(true);
+        }
     }
 
     public static isFavorite(s: PitchSetup) {
@@ -113,9 +139,10 @@ export default class GlobalConfig {
 
     private static async loadFavorites() {
         try {
-            this._favorites = (JSON.parse(await this._storage.getValue("favorites") ?? "null") ?? [])
+            const favoritesJson = await this._storage.getValue("favorites");
+            this._favorites = (JSON.parse(favoritesJson ?? "null") ?? [])
                 .map((i: any) => PitchSetup.fromPlainObject(i));
-        } catch {
+        } catch (e) {
             this._favorites = [];
         }
     }
@@ -182,6 +209,20 @@ export default class GlobalConfig {
     public static clearAllFavorites() {
         this._favorites = [];
         this.saveFavorites();
+    }
+
+    /**
+     * Flag to track if favorites need recalculation
+     * Set to true when config changes, false after recalculation
+     */
+    private static _needsRecalculation: boolean = false;
+
+    public static get needsRecalculation(): boolean {
+        return this._needsRecalculation;
+    }
+
+    public static setNeedsRecalculation(value: boolean) {
+        this._needsRecalculation = value;
     }
 
 

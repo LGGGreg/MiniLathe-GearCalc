@@ -19,7 +19,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        combinations: resolve(__dirname, 'src/workers/combinations.ts')
+        combinations: resolve(__dirname, 'src/workers/combinations.ts'),
+        recalculation: resolve(__dirname, 'src/workers/recalculation.ts')
       },
       output: {
         entryFileNames(chunkInfo) {

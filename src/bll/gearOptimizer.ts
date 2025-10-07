@@ -16,6 +16,7 @@ export class GearOptimizer {
     /**
      * Select the best gear combinations for multiple threads as a batch
      * Uses iterative improvement to avoid path dependency
+     * Considers ALL best-accuracy candidates for ALL threads globally
      * @param threads - Array of thread definitions with candidates
      * @returns Array of optimized PitchSetup objects (caller should add names)
      */
@@ -28,11 +29,37 @@ export class GearOptimizer {
     ): Array<{setup: PitchSetup, name: string}> {
         if (threads.length === 0) return [];
 
+        // Phase 0: Filter ALL threads to best-accuracy candidates FIRST
+        // This ensures we consider all possible best-accuracy combinations globally
+        const filteredThreads = threads.map(thread => {
+            // Find minimum error for this thread
+            const minError = Math.min(...thread.candidates.map(c =>
+                Math.abs(c.pitch.value - thread.targetPitch)
+            ));
+
+            // Filter to best accuracy with epsilon tolerance
+            const epsilon = 0.0000001;
+            const bestAccuracyCandidates = thread.candidates.filter(c =>
+                Math.abs(c.pitch.value - thread.targetPitch) <= minError + epsilon
+            );
+
+            if (bestAccuracyCandidates.length < thread.candidates.length) {
+                console.log(`[GearOptimizer] ${thread.name}: Filtered ${thread.candidates.length} → ${bestAccuracyCandidates.length} best-accuracy candidates (error: ${minError.toFixed(6)})`);
+            }
+
+            return {
+                ...thread,
+                candidates: bestAccuracyCandidates,
+                allCandidates: thread.candidates // Keep all for reference
+            };
+        });
+
         // Phase 1: Generate initial solution using greedy algorithm
-        const initial = this.generateGreedySolution(threads);
+        const initial = this.generateGreedySolution(filteredThreads);
 
         // Phase 2: Iterative improvement (hill climbing)
         // Try swapping each thread's setup with alternatives to improve total score
+        // Now we're only considering best-accuracy candidates, so we won't sacrifice accuracy
         let current = initial;
         let improved = true;
         let iterations = 0;
@@ -42,14 +69,14 @@ export class GearOptimizer {
             improved = false;
             iterations++;
 
-            const currentScore = this.calculateTotalScore(current, threads);
+            const currentScore = this.calculateTotalScore(current, filteredThreads);
 
             // Try improving each thread's selection
-            for (let i = 0; i < threads.length; i++) {
-                const thread = threads[i];
+            for (let i = 0; i < filteredThreads.length; i++) {
+                const thread = filteredThreads[i];
                 const currentSetup = current[i].setup;
 
-                // Try each alternative candidate
+                // Try each alternative best-accuracy candidate
                 for (const candidate of thread.candidates) {
                     if (candidate === currentSetup) continue;
 
@@ -58,7 +85,7 @@ export class GearOptimizer {
                     newSolution[i] = {setup: candidate, name: thread.name};
 
                     // Calculate new total score
-                    const newScore = this.calculateTotalScore(newSolution, threads);
+                    const newScore = this.calculateTotalScore(newSolution, filteredThreads);
 
                     // If better, accept it and continue improving
                     if (newScore > currentScore) {
@@ -78,6 +105,7 @@ export class GearOptimizer {
     /**
      * Generate initial solution using greedy algorithm
      * This provides a good starting point for iterative improvement
+     * Returns results in the SAME ORDER as input threads
      */
     private static generateGreedySolution(
         threads: Array<{
@@ -86,7 +114,6 @@ export class GearOptimizer {
             candidates: PitchSetup[]
         }>
     ): Array<{setup: PitchSetup, name: string}> {
-        const result: Array<{setup: PitchSetup, name: string}> = [];
         const selectedSetups: PitchSetup[] = [];
 
         // Sort threads by number of candidates (fewest first)
@@ -96,6 +123,7 @@ export class GearOptimizer {
         );
 
         // Select best setup for each thread, considering previously selected setups
+        const tempResults: Map<string, PitchSetup> = new Map();
         for (const thread of sortedThreads) {
             const bestSetup = this.selectBest(
                 thread.candidates,
@@ -104,12 +132,16 @@ export class GearOptimizer {
             );
 
             if (bestSetup) {
-                result.push({setup: bestSetup, name: thread.name});
+                tempResults.set(thread.name, bestSetup);
                 selectedSetups.push(bestSetup);
             }
         }
 
-        return result;
+        // Return results in original input order
+        return threads.map(thread => ({
+            setup: tempResults.get(thread.name)!,
+            name: thread.name
+        }));
     }
 
     /**
@@ -138,7 +170,9 @@ export class GearOptimizer {
 
     /**
      * Select the best gear combination from candidates
-     * @param candidates - Array of possible gear setups
+     * Note: This is used by generateGreedySolution, which is called AFTER
+     * global accuracy filtering in selectBestBatch
+     * @param candidates - Array of possible gear setups (already filtered to best accuracy)
      * @param targetPitch - The desired pitch value
      * @param favorites - Current favorite setups (for gear reuse analysis)
      * @returns The best gear setup
@@ -152,6 +186,7 @@ export class GearOptimizer {
         if (candidates.length === 1) return candidates[0];
 
         // Calculate scores for all candidates
+        // (Accuracy filtering is done globally in selectBestBatch)
         const scored = candidates.map(candidate => ({
             setup: candidate,
             score: this.calculateScore(candidate, targetPitch, favorites)
@@ -244,7 +279,7 @@ export class GearOptimizer {
     /**
      * Calculate how many gears are in the same position as in favorites
      * Rewards keeping gears in consistent positions (e.g., always using 20T in position A)
-     * B and C positions are weighted 3x higher because they're harder to change
+     * B and C positions are weighted 4x higher because they're harder to change
      */
     private static calculatePositionConsistencyScore(
         setup: PitchSetup,
@@ -253,16 +288,16 @@ export class GearOptimizer {
         let consistencyScore = 0;
 
         // Count how many favorites have the same gear in the same position
-        // B and C are weighted 3x because they're annoying to change
+        // B and C are weighted 4x because they're much harder to change
         favorites.forEach(fav => {
             if (setup.gearA && fav.gearA && Gears.equal(setup.gearA, fav.gearA)) {
                 consistencyScore += 1;  // A is easy to change
             }
             if (setup.gearB && fav.gearB && Gears.equal(setup.gearB, fav.gearB)) {
-                consistencyScore += 3;  // B is hard to change (3x weight)
+                consistencyScore += 4;  // B is hard to change (4x weight)
             }
             if (setup.gearC && fav.gearC && Gears.equal(setup.gearC, fav.gearC)) {
-                consistencyScore += 3;  // C is hard to change (3x weight)
+                consistencyScore += 4;  // C is hard to change (4x weight)
             }
             if (setup.gearD && fav.gearD && Gears.equal(setup.gearD, fav.gearD)) {
                 consistencyScore += 1;  // D is easy to change

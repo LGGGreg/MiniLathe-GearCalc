@@ -1,5 +1,12 @@
 <template>
     <div class="box">
+        <!-- Recalculation Banner -->
+        <RecalculationBanner
+            ref="recalcBanner"
+            @recalculate="handleRecalculation"
+            message="Settings or favorites have changed. Recalculate for optimal gear combinations?"
+            buttonText="Recalculate Now" />
+
         <div class="block">{{ i18n.favTitle }}</div>
       <div class="columns">
         <div class="column">
@@ -35,6 +42,7 @@ import PitchSetupTable, { AddToFavoritesRowCommand, RemoveFavoriteRowCommand } f
 import GlobalConfig from '@/bll/globalConfig';
 import { Gear } from '@/bll/gear';
 import type { GridRowCommandDefinition } from '@rozzy/vue-datagrid/src/GridCommandDefinition';
+import RecalculationBanner from '@/components/RecalculationBanner.vue';
 
 
 export default {
@@ -84,6 +92,28 @@ export default {
     props: {
         desiredPitch: { type: Pitch, default: new Pitch(1, PitchType.Metric) }
     },
-    components: { GeartrainImg, PitchSetupTable }
+    methods: {
+        async handleRecalculation(progressCallback: (progress: number) => void) {
+            try {
+                progressCallback(20);
+
+                // Emit event to parent (App.vue) to trigger recalculation in PitchTableTab
+                this.$emit('requestRecalculation');
+
+                progressCallback(80);
+
+                // Small delay
+                await new Promise(resolve => setTimeout(resolve, 300));
+
+                progressCallback(100);
+
+                console.log('[FavoritesTab] Recalculation request sent');
+            } catch (error) {
+                console.error('[FavoritesTab] Recalculation error:', error);
+                progressCallback(100);
+            }
+        }
+    },
+    components: { GeartrainImg, PitchSetupTable, RecalculationBanner }
 }
 </script>

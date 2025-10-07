@@ -142,7 +142,9 @@ export class PitchSetup {
             return new PitchSetup(gearA,gearB,gearC,gearD, new Pitch(0, leadscrew.type));
         }
         // All 4 gears must be provided (true 2-gear not physically possible)
-        const ratio = (gearB.teeth * gearD.teeth) / (gearA.teeth * gearC.teeth);
+        // Gear train: Spindle → A (driver) → B (driven) → C (driver) → D (driven) → Leadscrew
+        // Ratio = (A * C) / (B * D)
+        const ratio = (gearA.teeth * gearC.teeth) / (gearB.teeth * gearD.teeth);
         return new PitchSetup(gearA, gearB, gearC, gearD, leadscrew.withRatio(ratio));
     }
 }

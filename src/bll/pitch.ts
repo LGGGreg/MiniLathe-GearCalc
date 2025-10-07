@@ -22,7 +22,10 @@ export class Pitch {
     }
 
     public withRatio(ratio: number): Pitch{
-        return new Pitch(this.type == PitchType.Metric ? this.value / ratio : this.value * ratio, this.type);
+        // Ratio = (A * C) / (B * D) from gear train
+        // For Metric (mm/rev): output_pitch = leadscrew_pitch * ratio
+        // For Imperial (TPI): TPI is inverse of pitch, so output_TPI = leadscrew_TPI / ratio
+        return new Pitch(this.type == PitchType.Metric ? this.value * ratio : this.value / ratio, this.type);
     }
 
     public toString(roundTo: number = 0.001): string {
