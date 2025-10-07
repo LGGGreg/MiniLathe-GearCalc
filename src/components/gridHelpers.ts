@@ -34,7 +34,7 @@ export class PitchHelper {
     public static sortFnPreferImperial = this.sortFnPreferType(PitchType.Imperial);
 
     public static formatFn = function(p: Pitch) {
-        return p == null || p == undefined ? "" : GcMath.round(p.value, 0.001).toFixed(3) + " " + (p.type == PitchType.Metric ? "mm/rev" : "TPI");
+        return p == null || p == undefined ? "" : GcMath.round(p.value, 0.0001).toFixed(4) + " " + (p.type == PitchType.Metric ? "mm/rev" : "TPI");
     }
     public static formatFnShowMetric = function(p: Pitch) {
         return p == null || p == undefined ? "" : PitchHelper.formatFn(p.type == PitchType.Metric ? p : p.convert());
@@ -53,7 +53,7 @@ export class PitchHelper {
         const text = PitchHelper.formatFn(isImperial ? p.convert() : p);
         // Grey out if original pitch was imperial (converted to metric for display)
         return isImperial
-            ? `<span style="color: #999; opacity: 0.5;">${text}</span>`
+            ? `<span class="pitch-converted">${text}</span>`
             : text;
     }
     // Pi column shows imperial (TPI) - grey out if thread is metric
@@ -65,8 +65,23 @@ export class PitchHelper {
         const text = PitchHelper.formatFn(isMetric ? p.convert() : p);
         // Grey out if original pitch was metric (converted to imperial for display)
         return isMetric
-            ? `<span style="color: #999; opacity: 0.5;">${text}</span>`
+            ? `<span class="pitch-converted">${text}</span>`
             : text;
+    }
+
+    // Export functions that return plain text without HTML formatting
+    public static exportFnShowMetric = function(p: Pitch) {
+        if (p == null || p == undefined) return "";
+        const pitchType = Number(p.type);
+        const isImperial = pitchType == PitchType.Imperial;
+        return PitchHelper.formatFn(isImperial ? p.convert() : p);
+    }
+
+    public static exportFnShowImperial = function(p: Pitch) {
+        if (p == null || p == undefined) return "";
+        const pitchType = Number(p.type);
+        const isMetric = pitchType == PitchType.Metric;
+        return PitchHelper.formatFn(isMetric ? p.convert() : p);
     }
 }
 

@@ -77,12 +77,14 @@ export default {
         columns.push(
             new GridColumnDefinition("pi", "Pi", i => i.pitch, i18n.genericPitch+' ('+i18n.genericImperial+')')
                 .withFormat(PitchHelper.formatFnShowImperialGreyed)
+                .withExportFn(PitchHelper.exportFnShowImperial)
                 .withHtml()
                 .withSortForValues(PitchHelper.sortFnPreferImperial)
                 .withStyle("width: 20%")
                 .withAlignRight().withHeaderAlignRight(),
             new GridColumnDefinition("pm", "Pm", i => i.pitch, i18n.genericPitch+' ('+i18n.genericMetric+')')
                 .withFormat(PitchHelper.formatFnShowMetricGreyed)
+                .withExportFn(PitchHelper.exportFnShowMetric)
                 .withHtml()
                 .withSortForValues(PitchHelper.sortFnPreferMetric)
                 .withStyle("width: 20%")
@@ -210,5 +212,11 @@ export default {
 .pitch-setup-table .gear-d-color {
     color: var(--gear-d-color) !important;
     font-weight: 600 !important;
+}
+
+/* Converted pitch values (greyed out) */
+.pitch-setup-table .pitch-converted {
+    color: #999;
+    opacity: 0.5;
 }
 </style>
