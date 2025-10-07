@@ -75,36 +75,6 @@ export default {
         // Create worker client for recalculation
         const recalcWorkerClient = new WorkerClient<PitchSetup[]>();
 
-        // Sort favorites by category (metric/imperial), then by thread size
-        const sortedFavorites = [...GlobalConfig.favorites].sort((a, b) => {
-            // Extract category and size from name
-            const getCategory = (name?: string) => {
-                if (!name) return 'zzz'; // No name goes last
-                if (name.startsWith('M')) return 'a-metric'; // M6, M8, M10
-                if (name.startsWith('UNC')) return 'b-unc'; // UNC #0, UNC #1
-                if (name.startsWith('UNF')) return 'c-unf'; // UNF #1, UNF #2
-                if (name.startsWith('BSP')) return 'd-bsp'; // BSP
-                return 'e-other';
-            };
-
-            const getSize = (name?: string) => {
-                if (!name) return 999;
-                // Extract number from name (e.g., "M6" -> 6, "UNC #0" -> 0)
-                const match = name.match(/([0-9]+(?:\.[0-9]+)?)/);
-                return match ? parseFloat(match[1]) : 999;
-            };
-
-            const catA = getCategory(a.name);
-            const catB = getCategory(b.name);
-
-            if (catA !== catB) {
-                return catA.localeCompare(catB);
-            }
-
-            // Same category, sort by size
-            return getSize(a.name) - getSize(b.name);
-        });
-
         return {
             recalcWorkerClient,
             selectedSetup: new PitchSetup(Gear.fromString("M1Z20"), undefined, undefined, Gear.fromString("M1Z80"), new Pitch(1, PitchType.Metric)),
@@ -112,7 +82,7 @@ export default {
             orderAscending: true,
             rowCommands,
             config: GlobalConfig.config,
-            model: sortedFavorites,
+            model: [] as PitchSetup[],
             i18n: GlobalConfig.i18n
         }
     },
@@ -125,6 +95,70 @@ export default {
         desiredPitch: { type: Pitch, default: new Pitch(1, PitchType.Metric) }
     },
     methods: {
+        // Sort favorites by category (metric/imperial), then by thread size
+        // Matches the order used in PitchTableTab.vue
+        sortFavorites(favorites: PitchSetup[]): PitchSetup[] {
+            return [...favorites].sort((a, b) => {
+                // Extract category and subcategory from name
+                const getCategory = (name?: string) => {
+                    if (!name) return 'zzz'; // No name goes last
+                    if (name.startsWith('M')) return 'a-metric';
+                    if (name.startsWith('UNC #')) return 'b-unc-numbered'; // UNC #0, #1, etc.
+                    if (name.startsWith('UNC ')) return 'c-unc-fractional'; // UNC 1/4, 5/16, etc.
+                    if (name.startsWith('UNF #')) return 'd-unf-numbered'; // UNF #1, #2, etc.
+                    if (name.startsWith('UNF ')) return 'e-unf-fractional'; // UNF 1/4, 5/16, etc.
+                    if (name.startsWith('BSP') || name.startsWith('G ')) return 'f-bsp';
+                    return 'g-other';
+                };
+
+                const getSize = (name?: string) => {
+                    if (!name) return 999;
+
+                    // For numbered sizes (e.g., "UNC #0", "UNF #12")
+                    const numberedMatch = name.match(/#([0-9]+)/);
+                    if (numberedMatch) {
+                        return parseFloat(numberedMatch[1]);
+                    }
+
+                    // For fractional sizes (e.g., "UNC 1/4", "UNF 5/16", "UNC 1 1/8")
+                    // Extract the whole number and fraction parts
+                    const fractionalMatch = name.match(/([0-9]+(?:\s+[0-9]+\/[0-9]+|\/[0-9]+)?)/);
+                    if (fractionalMatch) {
+                        const sizeStr = fractionalMatch[1];
+                        // Convert fraction to decimal (e.g., "1/4" -> 0.25, "1 1/8" -> 1.125)
+                        const parts = sizeStr.split(/\s+/);
+                        let value = 0;
+                        for (const part of parts) {
+                            if (part.includes('/')) {
+                                const [num, den] = part.split('/').map(Number);
+                                value += num / den;
+                            } else {
+                                value += parseFloat(part);
+                            }
+                        }
+                        return value;
+                    }
+
+                    // For metric (e.g., "M6", "M2.5")
+                    const metricMatch = name.match(/M([0-9]+(?:\.[0-9]+)?)/);
+                    if (metricMatch) {
+                        return parseFloat(metricMatch[1]);
+                    }
+
+                    return 999;
+                };
+
+                const catA = getCategory(a.name);
+                const catB = getCategory(b.name);
+
+                if (catA !== catB) {
+                    return catA.localeCompare(catB);
+                }
+
+                // Same category, sort by size
+                return getSize(a.name) - getSize(b.name);
+            });
+        },
         async handleRecalculation(progressCallback: (progress: number) => void) {
             console.log('[FavoritesTab] handleRecalculation called');
             try {
@@ -291,8 +325,8 @@ export default {
                     });
                     console.log('[FavoritesTab] Favorites added, total favorites now:', GlobalConfig.favorites.length);
 
-                    // Update the model to show new favorites
-                    this.model = [...GlobalConfig.favorites];
+                    // Update the model to show new favorites with sorting
+                    this.model = this.sortFavorites(GlobalConfig.favorites);
                 } else {
                     console.error('[FavoritesTab] optimizedFavorites is not an array!', optimizedFavorites);
                 }
@@ -318,6 +352,10 @@ export default {
                 progressCallback(100); // Complete even on error
             }
         }
+    },
+    mounted() {
+        // Initialize model with sorted favorites
+        this.model = this.sortFavorites(GlobalConfig.favorites);
     },
     components: { GeartrainImg, PitchSetupTable, RecalculationBanner }
 }
