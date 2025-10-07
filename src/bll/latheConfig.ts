@@ -1,4 +1,4 @@
-import { Gear, GearModule, Gears } from "./gear";
+import { Gear, GearModule, Gears, ModuleType } from "./gear";
 import { PitchType, Pitch } from "./pitch";
 
 export default class LatheConfig {
@@ -10,7 +10,7 @@ export default class LatheConfig {
 
     // Placeholder gear for position C when gear is not available
     // Used when C is not connected (simplified 2-gear setup or unavailable gear)
-    public placeholderGearC: Gear = new Gear(20, GearModule.fromString("M1")!);
+    public placeholderGearC: Gear = new Gear(new GearModule(1, ModuleType.Metric), 20);
 
     // Auto-favorite configuration - now using thread names instead of TPI/pitch values
     public autoFavoriteThreads: string[] = [
@@ -92,7 +92,10 @@ export default class LatheConfig {
 
         // Load placeholder gear C with default if not present
         if (o.placeholderGearC) {
-            result.placeholderGearC = Gear.fromString(o.placeholderGearC);
+            const gear = Gear.fromString(o.placeholderGearC);
+            if (gear) {
+                result.placeholderGearC = gear;
+            }
         }
 
         return result;

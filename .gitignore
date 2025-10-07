@@ -27,3 +27,5 @@ coverage
 *.sw?
 
 test-results/
+
+playwright-report/

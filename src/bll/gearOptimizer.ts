@@ -1,4 +1,4 @@
-import { PitchSetup } from './pitchSetup';
+import type { PitchSetup } from './pitchSetup';
 import { Gears, type Gear } from './gear';
 import GlobalConfig from './globalConfig';
 

@@ -14,7 +14,8 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
-  base: "",
+  // For GitHub Pages: set base to your repo name
+  base: process.env.GITHUB_PAGES === 'true' ? '/MiniLathe-GearCalc/' : "",
   build: {
     rollupOptions: {
       input: {
