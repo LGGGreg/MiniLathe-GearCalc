@@ -20,9 +20,10 @@ export default class CombinationFinder {
     private createWorker(progressFn: (b: boolean, p: number | undefined) => void = ()=>{}){
         const c = new WorkerClient<PitchSetup[]>();
         // Use different path for dev vs production
+        const basePath = import.meta.env.BASE_URL || '/';
         const workerPath = import.meta.env.DEV
-            ? '/src/workers/combinations.ts'
-            : '/combinations.js';
+            ? `${basePath}src/workers/combinations.ts`
+            : `${basePath}combinations.js`;
         c.createWorker(workerPath, (o) => o?.map((i: any) => PitchSetup.fromPlainObject(i)), progressFn);
         this.workerClient = c;
     }

@@ -141,9 +141,10 @@ export default {
                 console.log('[FavoritesTab] Starting background recalculation...');
 
                 // Create worker with progress callback
+                const basePath = import.meta.env.BASE_URL || '/';
                 const workerPath = import.meta.env.DEV
-                    ? '/src/workers/recalculation.ts'
-                    : '/recalculation.js';
+                    ? `${basePath}src/workers/recalculation.ts`
+                    : `${basePath}recalculation.js`;
 
                 this.recalcWorkerClient.createWorker(
                     workerPath,
