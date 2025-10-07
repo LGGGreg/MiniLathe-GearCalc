@@ -4,6 +4,7 @@ import type TranslationsBase from '@/i18n/lang';
 import { EnTranslations } from '@/i18n/lang';
 import HuTranslations from '@/i18n/hu';
 import { Storage } from './storage';
+import { ref } from 'vue';
 
 export default class GlobalConfig {
     private static _storage = new Storage();
@@ -214,15 +215,16 @@ export default class GlobalConfig {
     /**
      * Flag to track if favorites need recalculation
      * Set to true when config changes, false after recalculation
+     * Using Vue ref for reactivity
      */
-    private static _needsRecalculation: boolean = false;
+    private static _needsRecalculation = ref(false);
 
     public static get needsRecalculation(): boolean {
-        return this._needsRecalculation;
+        return this._needsRecalculation.value;
     }
 
     public static setNeedsRecalculation(value: boolean) {
-        this._needsRecalculation = value;
+        this._needsRecalculation.value = value;
     }
 
 

@@ -27,7 +27,7 @@
         <SetupTab v-model:isBusy="isLoading" v-model:progress="loadingProgress" @configSaved="onConfigSaved" :key="i"/>
       </section>
       <section v-if="activeTab == ActiveTabs.PitchTable" class="" >
-        <PitchTableTab :key="i" />
+        <PitchTableTab ref="pitchTableTab" :key="i" />
       </section>
       <section v-if="activeTab == ActiveTabs.PitchForGears" class="" >
         <PitchForGearsTab v-model:gearA="gearA" v-model:gearB="gearB" v-model:gearC="gearC" v-model:gearD="gearD" :key="i"/>
@@ -83,8 +83,13 @@ import SetupTab from './views/SetupTab.vue';
 export default {
     data() {
         const combinator = new CombinationFinder((b, p) => this.setProgress(b, p));
+
+        // Default to PitchTable tab (shows recalculation banner if needed)
+        // User can navigate to Favorites after generating them
+        const defaultTab = ActiveTabs.PitchTable;
+
         return {
-            activeTab: GlobalConfig.favorites.length > 0 ? ActiveTabs.Favorites : ActiveTabs.PitchTable,
+            activeTab: defaultTab,
             combinator,
             gearA: undefined,
             gearB: undefined,
@@ -106,20 +111,50 @@ export default {
       }
     },
     async mounted() {
-      if(GlobalConfig.combos.length == 0 && GlobalConfig.config.gears.length > 2)
+      // Check if we need to calculate combos
+      const needsCombos = GlobalConfig.combos.length == 0 && GlobalConfig.config.gears.length > 2;
+      // Check if this is a fresh install (no favorites at all)
+      const isFreshInstall = GlobalConfig.favorites.length === 0;
+
+      if(needsCombos)
       {
           (async () => {
+            console.log('[App] Calculating gear combinations...');
             GlobalConfig.combos = await this.combinator.findAllCombinationsAsync();
+            console.log('[App] Gear combinations calculated:', GlobalConfig.combos.length);
 
-            // DON'T clear auto-favorites here!
-            // Auto-favorites should only be cleared when the user explicitly clicks
-            // "Recalculate Favorites" in the Pitch Table tab (which calls clearAutoFavorites).
-            // Clearing them here would delete favorites on every app load!
+            // If this is a fresh install (no favorites), automatically generate them
+            if (isFreshInstall) {
+              console.log('[App] Fresh install detected, auto-generating default favorites...');
+              GlobalConfig.setNeedsRecalculation(true);
 
-            // Set flag to trigger recalculation banner so user knows to generate favorites
-            GlobalConfig.setNeedsRecalculation(true);
-            this.i++;}
-          )()
+              // Force re-render to ensure PitchTableTab is mounted
+              this.i++;
+
+              // Wait for next tick to ensure component is rendered
+              await this.$nextTick();
+
+              // Wait a bit more for banner to mount
+              await new Promise(resolve => setTimeout(resolve, 1000));
+
+              // Trigger recalculation programmatically
+              const pitchTableTab = this.$refs.pitchTableTab as any;
+              if (pitchTableTab?.$refs?.recalcBanner) {
+                console.log('[App] Auto-triggering favorites generation...');
+                pitchTableTab.$refs.recalcBanner.startRecalculation();
+              } else {
+                console.log('[App] Could not auto-trigger - user must click "Recalculate Favorites"');
+                console.log('[App] pitchTableTab:', pitchTableTab);
+                console.log('[App] recalcBanner:', pitchTableTab?.$refs?.recalcBanner);
+              }
+            } else {
+              this.i++;
+            }
+          })()
+      } else if (isFreshInstall) {
+        // Combos exist but no favorites - show banner to generate them
+        console.log('[App] No favorites found, setting flag to generate them');
+        GlobalConfig.setNeedsRecalculation(true);
       }
     },
     components: { SetupTab, PitchTableTab, PitchForGearsTab, GearsForPitchTab, LanguageSelector, FavoritesTab, LoadingOverlay }

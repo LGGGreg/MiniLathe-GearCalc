@@ -213,13 +213,13 @@ export class GearOptimizer {
         favorites: PitchSetup[]
     ): number {
         let score = 0;
-        
+
         // 1. Pitch accuracy (most important) - weight: 10000
         // Closer to target = higher score
         const pitchError = Math.abs(setup.pitch.value - targetPitch);
         const pitchAccuracyScore = 10000 / (1 + pitchError * 1000);
         score += (pitchAccuracyScore * 1000);
-        
+
         // 2. Simplicity bonus
         // Prefer simplified 2-gear setups (B = C) over complex 4-gear setups
         // When B = C, B acts as spacer and C is not connected (D contacts B directly)
@@ -228,14 +228,14 @@ export class GearOptimizer {
         if (isSimplified2Gear) {
             score += 120000;  // B=C gets strong bonus (much simpler than 4 different gears)
         }
-        
+
         // 3. Gear reuse score - weight: 50 per matching gear
         // Prefer setups that use gears already in favorites
         if (favorites.length > 0) {
             const reuseScore = this.calculateGearReuseScore(setup, favorites);
             score += reuseScore * 5;
         }
-        
+
         // 4. Common gear position bonus - weight: 20 per position
         // Prefer setups where gears stay in the same position (A, B, C, or D)
         // B and C positions weighted 3x higher (harder to change)
@@ -243,7 +243,25 @@ export class GearOptimizer {
             const positionScore = this.calculatePositionConsistencyScore(setup, favorites);
             score += positionScore * 20;
         }
-        
+
+        // 5. Largest gear in slot D bonus - weight: 1000
+        // Prefer setups where the largest gear is in position D (driven on leadscrew)
+        // This provides better mechanical advantage and smoother operation
+        if (setup.gearD) {
+            const allGears = [setup.gearA, setup.gearB, setup.gearC, setup.gearD].filter(g => g !== undefined) as Gear[];
+            const maxTeeth = Math.max(...allGears.map(g => g.teeth));
+            if (setup.gearD.teeth === maxTeeth) {
+                score += 1000;
+            }
+        }
+
+        // 6. Large gear D bonus - weight: 500
+        // Prefer setups where gear D has 50 or more teeth
+        // Larger gears on the leadscrew provide smoother operation
+        if (setup.gearD && setup.gearD.teeth >= 50) {
+            score += 500;
+        }
+
         return score;
     }
     

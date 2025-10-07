@@ -303,9 +303,9 @@ export default {
 
                 progressCallback(30);
 
-                // Run worker with longer timeout (60 seconds)
+                // Run worker with longer timeout (120 seconds for large gear sets)
                 console.log('[PitchTableTab] Calling runWorker...');
-                const optimizedFavorites = await this.recalcWorkerClient.runWorker(workerInput, 60000);
+                const optimizedFavorites = await this.recalcWorkerClient.runWorker(workerInput, 120000);
 
                 console.log('[PitchTableTab] runWorker returned, type:', typeof optimizedFavorites, 'value:', optimizedFavorites);
                 progressCallback(80);
@@ -335,6 +335,14 @@ export default {
                 console.log('[PitchTableTab] Recalculation complete');
             } catch (error) {
                 console.error('[PitchTableTab] Recalculation error:', error);
+
+                // Show error message to user
+                if (error === 'Timeout') {
+                    alert('Recalculation timed out. This can happen with large gear sets. Try reducing the number of gears in Setup, or try again.');
+                } else {
+                    alert(`Recalculation failed: ${error}`);
+                }
+
                 progressCallback(100); // Complete even on error
             }
         },

@@ -65,7 +65,9 @@ export default defineComponent({
         showBanner() {
             // Show banner if recalculation is needed and not dismissed
             // Keep showing during recalculation so progress bar is visible
-            return (GlobalConfig.needsRecalculation || this.isRecalculating) && !this.dismissed;
+            // Access needsRecalculation to trigger reactivity
+            const needsRecalc = GlobalConfig.needsRecalculation;
+            return (needsRecalc || this.isRecalculating) && !this.dismissed;
         }
     },
     mounted() {
