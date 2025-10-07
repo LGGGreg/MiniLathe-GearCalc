@@ -16,6 +16,7 @@ You can use this tool as-is on the following link:
   - Prioritizes 2-gear setups over 4-gear setups
   - Prioritizes keeping gears in the same position (A, B, C, D) when possible
   - Prioritizes the largest gear in position D (leadscrew)
+- Adds some common metric and imperial threads to the favorites list by default
 
 ## Usage
 

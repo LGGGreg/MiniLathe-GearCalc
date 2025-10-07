@@ -25,10 +25,16 @@ export default defineConfig({
       },
       output: {
         entryFileNames(chunkInfo) {
-          const pp = (chunkInfo.facadeModuleId ?? "app").split("/");
-          const fp = pp[pp.length-1].split(".");
-          const id = (fp.length > 1 ? fp.slice(0, fp.length - 1) : fp).join(".");
-          return id + ".js";
+          // Worker files go to root with simple names
+          if (chunkInfo.name === 'combinations' || chunkInfo.name === 'recalculation') {
+            return '[name].js';
+          }
+          // Main app entry also goes to root as index.js
+          if (chunkInfo.name === 'main') {
+            return 'index.js';
+          }
+          // Everything else gets hashed in assets folder
+          return 'assets/[name]-[hash].js';
         },
       },
     },
