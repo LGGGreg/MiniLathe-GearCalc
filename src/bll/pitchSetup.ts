@@ -50,7 +50,7 @@ export class PitchSetup {
     public areGearsClearingAxles(minTeeth: number, minAxleDistanceCD: number = 44, minAxleDistanceAB: number = 34){
         // True 2-gear setups (B and C undefined) don't need clearance checks
         if (this.gearB == undefined && this.gearC == undefined) {
-            return true;
+            return false;
         }
 
         const pcA = Gears.pitchRadius(this.gearA)!;
