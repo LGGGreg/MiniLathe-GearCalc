@@ -30,6 +30,8 @@ export default class GlobalConfig {
             oldConfig.leadscrew.value !== v.leadscrew.value ||
             oldConfig.leadscrew.type !== v.leadscrew.type ||
             oldConfig.minTeeth !== v.minTeeth ||
+            oldConfig.minAxleDistanceCD !== v.minAxleDistanceCD ||
+            oldConfig.minAxleDistanceAB !== v.minAxleDistanceAB ||
             oldConfig.gears.length !== v.gears.length ||
             JSON.stringify(oldConfig.gears.map(g => g.toString()).sort()) !==
             JSON.stringify(v.gears.map(g => g.toString()).sort())

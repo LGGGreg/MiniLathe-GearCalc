@@ -41,13 +41,13 @@ export class PitchSetup {
         return this;
     }
 
-    public isValid(minTeeth: number): boolean {
+    public isValid(minTeeth: number, minAxleDistanceCD: number = 44, minAxleDistanceAB: number = 34): boolean {
         return this.areGearsProvided() &&
             this.areModulesMatching() &&
-            this.areGearsClearingAxles(minTeeth);
+            this.areGearsClearingAxles(minTeeth, minAxleDistanceCD, minAxleDistanceAB);
     }
 
-    public areGearsClearingAxles(minTeeth: number){
+    public areGearsClearingAxles(minTeeth: number, minAxleDistanceCD: number = 44, minAxleDistanceAB: number = 34){
         // True 2-gear setups (B and C undefined) don't need clearance checks
         if (this.gearB == undefined && this.gearC == undefined) {
             return true;
@@ -70,6 +70,21 @@ export class PitchSetup {
         // gear C interferes with the driving axle
         if (pcC > pcA + pcB - axleRadius)
             return false;
+
+        // Check minimum distance between C and D axles
+        // The distance between C and D axles must be at least the sum of their radii
+        // but also must meet the minimum physical constraint
+        const requiredDistanceCD = pcC + pcD;
+        if (requiredDistanceCD < minAxleDistanceCD)
+            return false;
+
+        // Check minimum distance between A and B axles
+        // The distance between A and B axles must be at least the sum of their radii
+        // but also must meet the minimum physical constraint
+        const requiredDistanceAB = pcA + pcB;
+        if (requiredDistanceAB < minAxleDistanceAB){
+          return false;
+        }
 
         return true;
     }

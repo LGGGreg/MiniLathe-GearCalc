@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { PitchSetup } from './pitchSetup';
-import { Pitch, PitchType } from './pitch';
-import { Gear, GearModule } from './gear';
+import { PitchSetup } from '../src/bll/pitchSetup';
+import { Pitch, PitchType } from '../src/bll/pitch';
+import { Gear, GearModule } from '../src/bll/gear';
 
 describe('Pitch Calculation', () => {
     describe('Formula verification', () => {

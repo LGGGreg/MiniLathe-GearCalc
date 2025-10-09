@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { GearOptimizer } from './gearOptimizer';
-import { PitchSetup } from './pitchSetup';
-import { Gear, Gears, GearModule } from './gear';
-import { Pitch, PitchType } from './pitch';
-import CombinationFinder from './combinationFinder';
-import LatheConfig from './latheConfig';
+import { GearOptimizer } from '../src/bll/gearOptimizer';
+import { PitchSetup } from '../src/bll/pitchSetup';
+import { Gear, Gears, GearModule } from '../src/bll/gear';
+import { Pitch, PitchType } from '../src/bll/pitch';
+import CombinationFinder from '../src/bll/combinationFinder';
+import LatheConfig from '../src/bll/latheConfig';
 
 describe('GearOptimizer', () => {
     let module: GearModule;

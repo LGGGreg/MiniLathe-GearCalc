@@ -8,6 +8,10 @@ export default class LatheConfig {
     public geartrainSize: number = 2;
     public gears: Gear[] = Gears.listFromTeeth([20,20,20,21,25,30,35,40,40,45,45,48,50,50,54,55,57,60,60,65,72,80,80], GearModule.fromString("M1")!);
 
+    // Minimum axle distances (in mm)
+    public minAxleDistanceCD: number = 44; // Minimum distance between C and D axles
+    public minAxleDistanceAB: number = 34; // Minimum distance between A and B axles
+
     // Placeholder gear for position C when gear is not available
     // Used when C is not connected (simplified 2-gear setup or unavailable gear)
     public placeholderGearC: Gear = new Gear(new GearModule(1, ModuleType.Metric), 20);
@@ -66,7 +70,9 @@ export default class LatheConfig {
             geartrainSize: this.geartrainSize,
             autoFavoriteThreads: this.autoFavoriteThreads,
             gearColors: this.gearColors,
-            placeholderGearC: this.placeholderGearC.toString()
+            placeholderGearC: this.placeholderGearC.toString(),
+            minAxleDistanceCD: this.minAxleDistanceCD,
+            minAxleDistanceAB: this.minAxleDistanceAB
         };
     }
 
@@ -96,6 +102,14 @@ export default class LatheConfig {
             if (gear) {
                 result.placeholderGearC = gear;
             }
+        }
+
+        // Load minimum axle distances with defaults if not present
+        if (o.minAxleDistanceCD !== undefined) {
+            result.minAxleDistanceCD = o.minAxleDistanceCD;
+        }
+        if (o.minAxleDistanceAB !== undefined) {
+            result.minAxleDistanceAB = o.minAxleDistanceAB;
         }
 
         return result;

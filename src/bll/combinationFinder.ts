@@ -70,7 +70,7 @@ export default class CombinationFinder {
                             continue;
 
                         const ps = this.findMetricPitch(ga, gb, gc, gd, config.leadscrew);
-                        if(!ps.isValid(config.minTeeth))
+                        if(!ps.isValid(config.minTeeth, config.minAxleDistanceCD, config.minAxleDistanceAB))
                             continue;
                         comboDict[k] = ps;
                     }

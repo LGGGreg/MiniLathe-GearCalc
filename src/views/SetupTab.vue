@@ -7,7 +7,7 @@
         <GearListEditor v-model="gears" v-model:maxSize="maxSize" @saved="saveConfig" />
       </div>
       <div class="box">
-        <OtherParamsEditor v-model:distance="distance" v-model:maxSize="maxSize" v-model:geartrain-size="geartrainSize" @saved="saveConfig" />
+        <OtherParamsEditor v-model:distance="distance" v-model:min-axle-distance-c-d="minAxleDistanceCD" v-model:min-axle-distance-a-b="minAxleDistanceAB" v-model:maxSize="maxSize" v-model:geartrain-size="geartrainSize" @saved="saveConfig" />
       </div>
       <div class="box">
         <div class="control">
@@ -43,6 +43,8 @@ export default {
         var gears = mv?.gears;
         var pitch = mv?.leadscrew;
         var distance = mv?.minTeeth;
+        var minAxleDistanceCD = mv?.minAxleDistanceCD;
+        var minAxleDistanceAB = mv?.minAxleDistanceAB;
         var maxSize = mv?.maxSize;
         var geartrainSize = mv?.geartrainSize;
         var combinator = new CombinationFinder((b, p) => this.setProgress(b, p));
@@ -50,6 +52,8 @@ export default {
             gears,
             pitch,
             distance,
+            minAxleDistanceCD,
+            minAxleDistanceAB,
             maxSize,
             geartrainSize,
             combinator,
@@ -66,6 +70,8 @@ export default {
             config.gears = this.gears.slice();
             config.leadscrew = this.pitch;
             config.minTeeth = this.distance;
+            config.minAxleDistanceCD = this.minAxleDistanceCD;
+            config.minAxleDistanceAB = this.minAxleDistanceAB;
             config.maxSize = this.maxSize;
             config.geartrainSize = this.geartrainSize;
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import CombinationFinder from './combinationFinder';
-import LatheConfig from './latheConfig';
-import { Gear, GearModule } from './gear';
+import CombinationFinder from '../src/bll/combinationFinder';
+import LatheConfig from '../src/bll/latheConfig';
+import { Gear, GearModule } from '../src/bll/gear';
 
 describe('Debug Combination Generation', () => {
     it('should generate 40, 65, 65, 30', async () => {
@@ -44,7 +44,7 @@ describe('Debug Combination Generation', () => {
         if (target) {
             console.log('✅ FOUND!');
             console.log(`Pitch: ${target.pitch.value} ${target.pitch.type === 1 ? 'TPI' : 'mm/rev'}`);
-            console.log(`Valid: ${target.isValid(config.minTeeth)}`);
+            console.log(`Valid: ${target.isValid(config.minTeeth, config.minAxleDistanceCD, config.minAxleDistanceAB)}`);
         } else {
             console.log('❌ NOT FOUND!');
         }
@@ -112,10 +112,10 @@ describe('Debug Combination Generation', () => {
 
         const manualSetup = finder.findMetricPitch(gearA, gearB, gearC, gearD, config.leadscrew);
         console.log(`Manual pitch: ${manualSetup.pitch.value} ${manualSetup.pitch.type === 1 ? 'TPI' : 'mm/rev'}`);
-        console.log(`Manual valid: ${manualSetup.isValid(config.minTeeth)}`);
+        console.log(`Manual valid: ${manualSetup.isValid(config.minTeeth, config.minAxleDistanceCD, config.minAxleDistanceAB)}`);
         console.log(`Manual areGearsProvided: ${manualSetup.areGearsProvided()}`);
         console.log(`Manual areModulesMatching: ${manualSetup.areModulesMatching()}`);
-        console.log(`Manual areGearsClearingAxles: ${manualSetup.areGearsClearingAxles(config.minTeeth)}`);
+        console.log(`Manual areGearsClearingAxles: ${manualSetup.areGearsClearingAxles(config.minTeeth, config.minAxleDistanceCD, config.minAxleDistanceAB)}`);
 
         // Check distance
         const distance = gearA.teeth + gearB.teeth;
